@@ -7,10 +7,25 @@ import { createAuthRouter } from './routes/auth.js';
 const app = express();
 const port = Number(process.env.PORT) || 4000;
 
-const corsOrigin = process.env.CORS_ORIGIN ?? 'http://localhost:3000';
+/** Comma-separated origins, e.g. `https://mysite.netlify.app,http://localhost:3000` */
+const corsOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:3000')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: corsOrigin,
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      if (corsOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
@@ -22,11 +37,25 @@ if (dbUrl) {
   const sql = neon(dbUrl);
   app.use('/auth', createAuthRouter(sql));
 } else {
-  console.warn('[api] DATABASE_URL is not set — POST /auth/register and /auth/login will not work');
+  console.warn('[api] DATABASE_URL is not set — auth routes return 503');
+  app.use('/auth', (_req, res) => {
+    res.status(503).json({
+      error:
+        'Auth is not configured: set DATABASE_URL on the API (e.g. Render environment variables) and redeploy.',
+    });
+  });
 }
 
 app.get('/health', (_req, res) => {
-  res.json({ ok: true, service: 'api' });
+  const hasDb = !!process.env.DATABASE_URL;
+  const jwtOk = process.env.NODE_ENV !== 'production' || !!process.env.JWT_SECRET;
+  res.json({
+    ok: true,
+    service: 'api',
+    authReady: hasDb && jwtOk,
+    databaseConfigured: hasDb,
+    jwtConfigured: jwtOk,
+  });
 });
 
 app.get('/db/health', async (_req, res) => {

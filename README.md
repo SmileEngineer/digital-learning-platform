@@ -21,8 +21,8 @@ npm install
 
 Copy environment examples and fill in values:
 
-- `apps/api/.env.example` → **`apps/api/.env`** or **repo root `.env`** — Neon `DATABASE_URL`, `JWT_SECRET` (required in production), optional `PORT`, `CORS_ORIGIN`. The API loads both paths so a single root `.env` works with the monorepo.
-- `apps/web/.env.example` → `apps/web/.env.local` — **`API_URL`** (server-only, e.g. `http://localhost:4000`) so Next.js can proxy auth to Express; **`NEXT_PUBLIC_API_URL`** is optional for any direct client calls to the API
+- `apps/api/.env.example` → `**apps/api/.env**` or **repo root `.env`** — Neon `DATABASE_URL`, `JWT_SECRET` (required in production), optional `PORT`, `CORS_ORIGIN`. The API loads both paths so a single root `.env` works with the monorepo.
+- `apps/web/.env.example` → `apps/web/.env.local` — `**API_URL**` (server-only, e.g. `http://localhost:4000`) so Next.js can proxy auth to Express; `**NEXT_PUBLIC_API_URL**` is optional for any direct client calls to the API
 
 ### Database (auth)
 
@@ -36,10 +36,12 @@ npm run db:migrate
 
 Seeded accounts use the same password for local testing:
 
-| Email | Password |
-|-------|----------|
-| `demo@learnhub.local` | `demo12345` |
+
+| Email                  | Password    |
+| ---------------------- | ----------- |
+| `demo@learnhub.local`  | `demo12345` |
 | `admin@learnhub.local` | `demo12345` |
+
 
 Use these on `/login` with the web app and API running (`npm run dev` and `npm run dev:api`). Seeds are defined in `apps/api/db/migrations/002_seed.sql`.
 
@@ -73,3 +75,28 @@ npm run start:api
 ```
 
 Health checks: `GET http://localhost:4000/health` and, when `DATABASE_URL` is set, `GET http://localhost:4000/db/health`.
+
+### Deploying the frontend (e.g. Netlify)
+
+The Next.js app (`apps/web`) and the Express API (`apps/api`) are separate processes. **Netlify only runs the frontend** unless you add custom serverless work—so you must **deploy the API elsewhere** (Railway, Render, Fly.io, a VPS, etc.) and point the web app at it.
+
+**Example (Render API + Netlify site):**
+
+
+| Where                    | Variable       | Example value                                                                     |
+| ------------------------ | -------------- | --------------------------------------------------------------------------------- |
+| **Netlify**              | `API_URL`      | `https://digital-learning-platform-6931.onrender.com`                             |
+| **Render** (API service) | `DATABASE_URL` | Your Neon connection string                                                       |
+| **Render**               | `JWT_SECRET`   | Long random string (required in production; e.g. `openssl rand -base64 32`)       |
+| **Render**               | `CORS_ORIGIN`  | `https://digital-learnhub.netlify.app` (comma-separated if you have more origins) |
+
+
+1. Run `**npm run db:migrate`** locally (or from CI) with `DATABASE_URL` pointing at the **same** Neon DB your Render API uses, so the `users` table exists in production.
+2. In **Netlify → Site configuration → Environment variables**, set `**API_URL`** to your Render API base URL (no trailing slash). **Redeploy** the site after saving—`API_URL` is read at runtime by the Next.js server, not baked into the client bundle.
+3. Do **not** leave `API_URL` as `http://localhost:4000` on Netlify; login will fail.
+
+**Checks:** Open `GET https://<your-api>/health` — you should see `authReady: true` when `DATABASE_URL` and (in production) `JWT_SECRET` are set. If `authReady` is false, fix Render env vars and redeploy the API.
+
+**Render free tier:** The service may sleep; the first request after idle can take 30–60 seconds. Retry login, or hit `/health` once to wake the API. The web app waits up to 25 seconds for the upstream API before showing a timeout message.
+
+If login still fails, test the API directly: `POST https://<your-api>/auth/login` with JSON `{ "email": "...", "password": "..." }` and `Content-Type: application/json`.

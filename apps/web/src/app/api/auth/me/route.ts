@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { AUTH_COOKIE_NAME, AUTH_COOKIE_PATH } from '@/lib/auth-cookie';
 import { fetchUpstream } from '@/lib/upstream-fetch';
 
+export const runtime = 'nodejs';
+
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {

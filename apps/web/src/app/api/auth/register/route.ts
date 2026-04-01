@@ -6,6 +6,8 @@ import {
 } from '@/lib/auth-cookie';
 import { fetchUpstream } from '@/lib/upstream-fetch';
 
+export const runtime = 'nodejs';
+
 export async function POST(req: NextRequest) {
   let body: unknown;
   try {
