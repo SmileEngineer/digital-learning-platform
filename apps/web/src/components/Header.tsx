@@ -1,53 +1,114 @@
+'use client';
+
+import Image from 'next/image';
 import Link from 'next/link';
-import { GraduationCap, User } from 'lucide-react';
-import { Button } from './Button';
+import { usePathname } from 'next/navigation';
+import { LogOut, ShoppingCart, User } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { NavMegaMenuTrigger } from './NavMegaMenu';
+import { MobileCatalogDrawer } from './MobileCatalogDrawer';
+
+function NavLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+  const active = pathname === href || (href !== '/' && pathname.startsWith(href));
+  return (
+    <Link
+      href={href}
+      className={`nav-kantri-link rounded-md px-1 py-2 text-[0.9375rem] font-medium transition-colors ${
+        active ? 'text-indigo-700' : 'text-slate-700 hover:text-indigo-600'
+      }`}
+    >
+      {children}
+    </Link>
+  );
+}
 
 export function Header() {
+  const { user, logout } = useAuth();
+
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
-      {/* Announcement bar */}
-      <div className="bg-indigo-600 text-white text-center py-2 text-sm">
-        🎉 New courses launching this week! Get 20% off with code LEARN20
+    <header className="sticky top-0 z-50 border-b border-slate-200/90 bg-white/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/90">
+      <div className="bg-gradient-to-r from-indigo-600 to-blue-600 py-2 text-center text-sm font-medium text-white">
+        New curriculum aligned with university semesters — browse by State, University & Semester I–VI
+        in the menu.
       </div>
-      
-      {/* Main header */}
+
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center gap-2">
-            <GraduationCap className="w-8 h-8 text-indigo-600" />
-            <span className="text-xl">LearnHub</span>
-          </Link>
-          
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/courses" className="text-slate-700 hover:text-indigo-600 transition-colors">
-              Courses
+        <div className="flex h-[4.375rem] items-center justify-between gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <MobileCatalogDrawer />
+            <Link href="/" className="flex min-w-0 items-center gap-3">
+              <span className="relative flex h-12 w-12 shrink-0 overflow-hidden rounded-full border-[1.5px] border-indigo-600 bg-white shadow-[0_4px_14px_rgba(37,99,235,0.22)]">
+                <Image
+                  src="/images/logo.png"
+                  alt="LearnHub"
+                  width={48}
+                  height={48}
+                  className="h-full w-full object-cover"
+                  priority
+                />
+              </span>
+              <div className="hidden min-w-0 flex-col leading-tight sm:flex">
+                <span className="truncate text-[1.35rem] font-black tracking-tight text-slate-900 sm:text-[1.55rem]">
+                  LEARN<span className="text-indigo-600">HUB</span>
+                </span>
+              </div>
             </Link>
-            <Link href="/ebooks" className="text-slate-700 hover:text-indigo-600 transition-colors">
-              eBooks
-            </Link>
-            <Link href="/books" className="text-slate-700 hover:text-indigo-600 transition-colors">
-              Bookstore
-            </Link>
-            <Link href="/live-classes" className="text-slate-700 hover:text-indigo-600 transition-colors">
-              Live Classes
-            </Link>
-            <Link href="/practice-exams" className="text-slate-700 hover:text-indigo-600 transition-colors">
-              Practice Exams
-            </Link>
-            <Link href="/articles" className="text-slate-700 hover:text-indigo-600 transition-colors">
-              Articles
-            </Link>
+          </div>
+
+          <nav className="hidden items-center gap-1 lg:flex">
+            <NavLink href="/">Home</NavLink>
+            <NavMegaMenuTrigger base="/courses" label="Courses" />
+            <NavMegaMenuTrigger base="/ebooks" label="eBooks" />
+            <NavLink href="/books">Bookstore</NavLink>
+            <NavLink href="/live-classes">Live Classes</NavLink>
+            <NavLink href="/contact">Contact</NavLink>
           </nav>
-          
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard">
-              <Button variant="ghost" size="sm">
-                <User className="w-5 h-5" />
-              </Button>
+
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            {user && (
+              <Link
+                href="/dashboard"
+                className="hidden max-w-[10rem] truncate rounded-lg px-2 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 sm:inline-block"
+                title={user.name}
+              >
+                {user.name.split(/\s+/)[0]}
+              </Link>
+            )}
+            <Link
+              href="/checkout"
+              className="relative flex items-center rounded-lg p-2 text-slate-700 hover:bg-slate-100"
+              aria-label="Cart"
+            >
+              <ShoppingCart className="h-[22px] w-[22px]" />
             </Link>
-            <Link href="/login">
-              <Button size="sm">Login</Button>
-            </Link>
+            {user ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  await logout();
+                  window.location.assign('/');
+                }}
+                className="inline-flex items-center gap-1.5 rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50"
+              >
+                <LogOut className="h-[18px] w-[18px]" />
+                <span className="hidden sm:inline">Log out</span>
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-2 rounded-[10px] bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+              >
+                <User className="h-[18px] w-[18px]" />
+                <span className="hidden sm:inline">Login</span>
+              </Link>
+            )}
           </div>
         </div>
       </div>

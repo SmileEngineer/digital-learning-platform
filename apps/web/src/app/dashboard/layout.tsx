@@ -1,3 +1,4 @@
+import { DashboardAuthGate } from '@/components/DashboardAuthGate';
 import { DashboardLayout } from '@/layouts/DashboardLayout';
 
 export default function Layout({
@@ -5,5 +6,9 @@ export default function Layout({
 }: {
   children: React.ReactNode;
 }) {
-  return <DashboardLayout>{children}</DashboardLayout>;
+  return (
+    <DashboardAuthGate>
+      <DashboardLayout>{children}</DashboardLayout>
+    </DashboardAuthGate>
+  );
 }

@@ -1,0 +1,2 @@
+-- Deprecated: use `npm run db:migrate` (repo root) or `npm run db:migrate --workspace=api`.
+-- The canonical schema lives in `db/migrations/001_initial.sql`.

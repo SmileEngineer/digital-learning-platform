@@ -7,7 +7,9 @@ export function Footer() {
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div>
-            <h3 className="text-white mb-4">LearnHub</h3>
+            <h3 className="mb-4 font-black tracking-tight text-white">
+              LEARN<span className="text-indigo-400">HUB</span>
+            </h3>
             <p className="text-sm mb-4">
               Your trusted platform for digital learning, ebooks, and educational resources.
             </p>
@@ -28,13 +30,15 @@ export function Footer() {
           </div>
           
           <div>
-            <h4 className="text-white mb-4">Products</h4>
+            <h4 className="text-white mb-4">Quick links</h4>
             <ul className="space-y-2 text-sm">
-              <li><Link href="/courses" className="hover:text-white transition-colors">Courses</Link></li>
-              <li><Link href="/ebooks" className="hover:text-white transition-colors">eBooks & PDFs</Link></li>
-              <li><Link href="/books" className="hover:text-white transition-colors">Physical Books</Link></li>
-              <li><Link href="/live-classes" className="hover:text-white transition-colors">Live Classes</Link></li>
-              <li><Link href="/practice-exams" className="hover:text-white transition-colors">Practice Exams</Link></li>
+              <li><Link href="/courses" className="hover:text-white transition-colors">All courses</Link></li>
+              <li><Link href="/ebooks" className="hover:text-white transition-colors">eBooks library</Link></li>
+              <li><Link href="/books" className="hover:text-white transition-colors">Bookstore</Link></li>
+              <li><Link href="/live-classes" className="hover:text-white transition-colors">Live classes</Link></li>
+              <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
+              <li><Link href="/practice-exams" className="hover:text-white transition-colors">Practice exams</Link></li>
+              <li><Link href="/articles" className="hover:text-white transition-colors">Articles</Link></li>
             </ul>
           </div>
           
@@ -42,7 +46,7 @@ export function Footer() {
             <h4 className="text-white mb-4">Support</h4>
             <ul className="space-y-2 text-sm">
               <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Contact Us</a></li>
+              <li><Link href="/contact" className="hover:text-white transition-colors">Contact us</Link></li>
               <li><a href="#" className="hover:text-white transition-colors">FAQs</a></li>
               <li><a href="#" className="hover:text-white transition-colors">Terms of Service</a></li>
               <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
@@ -58,7 +62,7 @@ export function Footer() {
                 placeholder="Your email"
                 className="flex-1 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
               />
-              <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+              <button className="rounded-lg bg-indigo-600 px-4 py-2 text-white transition-colors hover:bg-indigo-700">
                 <Mail className="w-4 h-4" />
               </button>
             </div>

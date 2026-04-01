@@ -21,8 +21,33 @@ npm install
 
 Copy environment examples and fill in values:
 
-- `apps/api/.env.example` → `apps/api/.env` (Neon `DATABASE_URL`, optional `PORT`, `CORS_ORIGIN`)
-- `apps/web/.env.example` → `apps/web/.env.local` (`NEXT_PUBLIC_API_URL` pointing at the API, e.g. `http://localhost:4000`)
+- `apps/api/.env.example` → **`apps/api/.env`** or **repo root `.env`** — Neon `DATABASE_URL`, `JWT_SECRET` (required in production), optional `PORT`, `CORS_ORIGIN`. The API loads both paths so a single root `.env` works with the monorepo.
+- `apps/web/.env.example` → `apps/web/.env.local` — **`API_URL`** (server-only, e.g. `http://localhost:4000`) so Next.js can proxy auth to Express; **`NEXT_PUBLIC_API_URL`** is optional for any direct client calls to the API
+
+### Database (auth)
+
+Apply migrations so the `users` table and seed data exist (requires `DATABASE_URL` in `apps/api/.env` or the repo root `.env`):
+
+```bash
+npm run db:migrate
+```
+
+### Test login (after migrate)
+
+Seeded accounts use the same password for local testing:
+
+| Email | Password |
+|-------|----------|
+| `demo@learnhub.local` | `demo12345` |
+| `admin@learnhub.local` | `demo12345` |
+
+Use these on `/login` with the web app and API running (`npm run dev` and `npm run dev:api`). Seeds are defined in `apps/api/db/migrations/002_seed.sql`.
+
+### Auth behavior
+
+- **Express:** `POST /auth/register`, `POST /auth/login`, `GET /auth/me` — bcrypt passwords; JWT issued on register/login.
+- **Next.js:** `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout` proxy to Express and store the JWT in an **httpOnly, SameSite=Lax** cookie (`learnhub_session`). The browser never sees the token; use `credentials: 'include'` on auth fetches.
+- **Dashboard:** `/dashboard` requires a valid session; unauthenticated users are sent to `/login?next=/dashboard`.
 
 ## Development
 

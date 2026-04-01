@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { EbookCard } from '../components/EbookCard';
+import { CatalogFilterBanner } from '../components/CatalogFilterBanner';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { Button } from '../components/Button';
 
@@ -63,6 +64,7 @@ export function EbooksPage() {
   return (
     <div className="py-8">
       <div className="container mx-auto px-4">
+        <CatalogFilterBanner />
         <div className="mb-8">
           <h1 className="text-4xl mb-3">eBooks & PDFs</h1>
           <p className="text-slate-600 text-lg">Download and read our extensive digital library</p>

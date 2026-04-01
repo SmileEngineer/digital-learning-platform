@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   LayoutDashboard,
   BookOpen,
@@ -30,6 +31,8 @@ const navItems = [
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { logout } = useAuth();
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -46,6 +49,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             </Link>
             <button
               type="button"
+              onClick={async () => {
+                await logout();
+                router.push('/');
+              }}
               className="flex items-center gap-2 text-slate-600 hover:text-slate-900 text-sm"
             >
               <LogOut className="w-4 h-4" />

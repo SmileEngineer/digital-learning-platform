@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { CourseCard } from '../components/CourseCard';
+import { CatalogFilterBanner } from '../components/CatalogFilterBanner';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { Button } from '../components/Button';
 
@@ -87,6 +88,7 @@ export function CoursesPage() {
   return (
     <div className="py-8">
       <div className="container mx-auto px-4">
+        <CatalogFilterBanner />
         {/* Page Header */}
         <div className="mb-8">
           <h1 className="text-4xl mb-3">All Courses</h1>
