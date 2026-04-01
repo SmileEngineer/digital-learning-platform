@@ -1,0 +1,74 @@
+import Link from 'next/link';
+import { Facebook, Twitter, Instagram, Linkedin, Mail } from 'lucide-react';
+
+export function Footer() {
+  return (
+    <footer className="bg-slate-900 text-slate-300">
+      <div className="container mx-auto px-4 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+          <div>
+            <h3 className="text-white mb-4">LearnHub</h3>
+            <p className="text-sm mb-4">
+              Your trusted platform for digital learning, ebooks, and educational resources.
+            </p>
+            <div className="flex gap-3">
+              <a href="#" className="hover:text-white transition-colors">
+                <Facebook className="w-5 h-5" />
+              </a>
+              <a href="#" className="hover:text-white transition-colors">
+                <Twitter className="w-5 h-5" />
+              </a>
+              <a href="#" className="hover:text-white transition-colors">
+                <Instagram className="w-5 h-5" />
+              </a>
+              <a href="#" className="hover:text-white transition-colors">
+                <Linkedin className="w-5 h-5" />
+              </a>
+            </div>
+          </div>
+          
+          <div>
+            <h4 className="text-white mb-4">Products</h4>
+            <ul className="space-y-2 text-sm">
+              <li><Link href="/courses" className="hover:text-white transition-colors">Courses</Link></li>
+              <li><Link href="/ebooks" className="hover:text-white transition-colors">eBooks & PDFs</Link></li>
+              <li><Link href="/books" className="hover:text-white transition-colors">Physical Books</Link></li>
+              <li><Link href="/live-classes" className="hover:text-white transition-colors">Live Classes</Link></li>
+              <li><Link href="/practice-exams" className="hover:text-white transition-colors">Practice Exams</Link></li>
+            </ul>
+          </div>
+          
+          <div>
+            <h4 className="text-white mb-4">Support</h4>
+            <ul className="space-y-2 text-sm">
+              <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Contact Us</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">FAQs</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Terms of Service</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
+            </ul>
+          </div>
+          
+          <div>
+            <h4 className="text-white mb-4">Newsletter</h4>
+            <p className="text-sm mb-3">Subscribe to get updates on new courses and offers.</p>
+            <div className="flex gap-2">
+              <input 
+                type="email" 
+                placeholder="Your email"
+                className="flex-1 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
+              />
+              <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                <Mail className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div className="border-t border-slate-800 pt-6 text-sm text-center">
+          <p>&copy; 2026 LearnHub. All rights reserved.</p>
+        </div>
+      </div>
+    </footer>
+  );
+}
