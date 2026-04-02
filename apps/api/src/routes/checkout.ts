@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
-import { requireSessionUser } from '../auth/session.js';
+import { getSessionUser, requireSessionUser } from '../auth/session.js';
 import { addDays, asMoney, getCatalogItemBySlug, mapCatalogItem } from '../platform.js';
 
 type CheckoutBody = {
@@ -32,6 +32,12 @@ type CouponRow = {
   applicable_emails: string[] | null;
 };
 
+type CourseAccessRow = {
+  id: string;
+  access_type: 'lifetime' | 'fixed_months';
+  access_months: number | null;
+};
+
 function validateBookPin(pin: string): boolean {
   return /^\d{6}$/.test(pin) && !pin.startsWith('0');
 }
@@ -40,6 +46,17 @@ function createOrderNumber(): string {
   const stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 14);
   const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
   return `LH-${stamp}-${rand}`;
+}
+
+function addMonths(months: number | null): Date | null {
+  if (!months || months <= 0) return null;
+  const d = new Date();
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return d;
+}
+
+function roundMoney(value: number): number {
+  return Number(value.toFixed(2));
 }
 
 function computeDiscount(
@@ -76,11 +93,34 @@ async function loadCoupon(sql: NeonQueryFunction<false, false>, code?: string): 
   return rows[0] ?? null;
 }
 
+async function loadCourseAccess(sql: NeonQueryFunction<false, false>, slug: string): Promise<CourseAccessRow | null> {
+  const rows = (await sql`
+    SELECT id, access_type, access_months
+    FROM courses
+    WHERE slug = ${slug}
+    LIMIT 1
+  `) as CourseAccessRow[];
+  return rows[0] ?? null;
+}
+
+function resolveAccessExpiry(
+  item: Awaited<ReturnType<typeof getCatalogItemBySlug>> extends infer T ? NonNullable<T> : never,
+  courseAccess: CourseAccessRow | null
+): Date | null {
+  if (courseAccess) {
+    return courseAccess.access_type === 'fixed_months'
+      ? addMonths(courseAccess.access_months)
+      : null;
+  }
+  return addDays(item.validity_days);
+}
+
 export function createCheckoutRouter(sql: NeonQueryFunction<false, false>): Router {
   const router = Router();
 
   router.post('/quote', async (req, res) => {
     try {
+      const user = await getSessionUser(req, sql);
       const body = (req.body ?? {}) as CheckoutBody;
       const slug = typeof body.product === 'string' ? body.product.trim() : '';
       if (!slug) {
@@ -101,9 +141,9 @@ export function createCheckoutRouter(sql: NeonQueryFunction<false, false>): Rout
       }
 
       const coupon = await loadCoupon(sql, body.couponCode);
-      const subtotal = asMoney(item.price) * quantity;
-      const discount = computeDiscount(coupon, subtotal, item.type, item.slug, '');
-      const total = Math.max(0, subtotal - discount);
+      const subtotal = roundMoney(asMoney(item.price) * quantity);
+      const discount = computeDiscount(coupon, subtotal, item.type, item.slug, user?.email ?? '');
+      const total = roundMoney(Math.max(0, subtotal - discount));
 
       const requiresShipping = item.type === 'physical_book';
       const pinCode = body.shipping?.pinCode?.trim() ?? '';
@@ -164,10 +204,11 @@ export function createCheckoutRouter(sql: NeonQueryFunction<false, false>): Rout
       }
 
       const coupon = await loadCoupon(sql, body.couponCode);
-      const subtotal = asMoney(item.price) * quantity;
+      const subtotal = roundMoney(asMoney(item.price) * quantity);
       const discount = computeDiscount(coupon, subtotal, item.type, item.slug, user.email);
-      const total = Math.max(0, subtotal - discount);
+      const total = roundMoney(Math.max(0, subtotal - discount));
       const orderNumber = createOrderNumber();
+      const courseAccess = item.type === 'course' ? await loadCourseAccess(sql, item.slug) : null;
 
       const orderRows = await sql`
         INSERT INTO orders (
@@ -206,7 +247,7 @@ export function createCheckoutRouter(sql: NeonQueryFunction<false, false>): Rout
       `;
       const order = orderRows[0] as { id: string; order_number: string };
 
-      const accessExpiry = addDays(item.validity_days);
+      const accessExpiry = resolveAccessExpiry(item, courseAccess);
       await sql`
         INSERT INTO order_items (
           order_id,
@@ -306,6 +347,28 @@ export function createCheckoutRouter(sql: NeonQueryFunction<false, false>): Rout
               ELSE user_entitlements.remaining_attempts + EXCLUDED.remaining_attempts
             END
         `;
+
+        if (item.type === 'course' && courseAccess) {
+          await sql`
+            INSERT INTO course_purchases (
+              user_id,
+              course_id,
+              access_expires_at,
+              progress_percent,
+              completed_lectures
+            )
+            VALUES (
+              ${user.id},
+              ${courseAccess.id},
+              ${accessExpiry},
+              0,
+              0
+            )
+            ON CONFLICT (user_id, course_id)
+            DO UPDATE
+            SET access_expires_at = EXCLUDED.access_expires_at
+          `;
+        }
       }
 
       res.status(201).json({

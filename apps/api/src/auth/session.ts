@@ -16,6 +16,37 @@ function parseBearer(req: Request): string | null {
   return h.slice(7).trim() || null;
 }
 
+async function loadSessionUser(
+  sql: NeonQueryFunction<false, false>,
+  token: string | null
+): Promise<SessionUser | null> {
+  if (!token) return null;
+
+  const payload = verifyUserToken(token);
+  if (!payload) return null;
+
+  const rows = await sql`
+    SELECT id, email, name, role, phone
+    FROM users
+    WHERE id = ${payload.sub}
+    LIMIT 1
+  `;
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const user = rows[0] as SessionUser;
+  return user;
+}
+
+export async function getSessionUser(
+  req: Request,
+  sql: NeonQueryFunction<false, false>
+): Promise<SessionUser | null> {
+  return loadSessionUser(sql, parseBearer(req));
+}
+
 export async function requireSessionUser(
   req: Request,
   res: Response,
@@ -33,18 +64,11 @@ export async function requireSessionUser(
     return null;
   }
 
-  const rows = await sql`
-    SELECT id, email, name, role, phone
-    FROM users
-    WHERE id = ${payload.sub}
-    LIMIT 1
-  `;
-
-  if (rows.length === 0) {
+  const user = await loadSessionUser(sql, token);
+  if (!user) {
     res.status(401).json({ error: 'Account not found.' });
     return null;
   }
 
-  const user = rows[0] as SessionUser;
   return user;
 }

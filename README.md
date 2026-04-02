@@ -45,6 +45,37 @@ Seeded accounts use the same password for local testing:
 
 Use these on `/login` with the web app and API running (`npm run dev` and `npm run dev:api`). Seeds are defined in `apps/api/db/migrations/002_seed.sql`.
 
+### Sample materials and checkout testing
+
+Additional demo content is seeded by `apps/api/db/migrations/005_seed_more_demo_materials.sql`.
+
+Sample slugs you can use for manual testing:
+
+| Type            | Slug                                 | Notes                    |
+| --------------- | ------------------------------------ | ------------------------ |
+| Course          | `cloud-devops-accelerator`           | 3-month access           |
+| Course          | `complete-web-development-bootcamp`  | 6-month access           |
+| eBook           | `ui-ux-design-playbook`              | Lifetime access          |
+| Physical book   | `system-design-interview-kit`        | Shipping flow            |
+| Live class      | `sql-analytics-live-bootcamp`        | Scheduled session        |
+| Practice exam   | `full-stack-developer-practice-exam` | Limited attempts         |
+| Article         | `how-to-plan-a-6-month-learning-path`| Free catalog article     |
+
+Demo coupon for checkout testing:
+
+| Coupon    | Who can use it          | Applies to                                 | Discount |
+| --------- | ----------------------- | ------------------------------------------ | -------- |
+| `DEMO25`  | `demo@learnhub.local`   | `course`, `ebook`, `live_class`, `practice_exam` | 25% off  |
+| `WELCOME10` | Any seeded/local user | Most purchasable catalog items             | 10% off  |
+
+Recommended manual test flow:
+
+1. Sign in as `demo@learnhub.local`.
+2. Open a course such as `/courses/cloud-devops-accelerator` and confirm only preview lectures are visible before purchase.
+3. Click `Buy Now` to reach `/checkout?product=cloud-devops-accelerator`.
+4. Apply `DEMO25` and complete the purchase.
+5. Verify the course appears in `/dashboard/courses` and the full curriculum is unlocked.
+
 ### Auth behavior
 
 - **Express:** `POST /auth/register`, `POST /auth/login`, `GET /auth/me` — bcrypt passwords; JWT issued on register/login.

@@ -20,7 +20,6 @@ import { CourseCard } from '@/components/CourseCard';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   fetchCourseDetail,
-  purchaseCourse,
   type CourseDetail,
   type CourseSummary,
 } from '@/lib/course-api';
@@ -42,9 +41,6 @@ export function CourseDetailsPage() {
   const [relatedCourses, setRelatedCourses] = useState<CourseSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [purchaseError, setPurchaseError] = useState<string | null>(null);
-  const [purchasing, setPurchasing] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -81,24 +77,13 @@ export function CourseDetailsPage() {
     [course]
   );
 
-  async function handlePurchase() {
+  function handleCheckoutRedirect() {
     if (!course) return;
     if (!user) {
-      router.push(`/login?next=/courses/${course.slug}`);
+      router.push(`/login?next=/checkout?product=${encodeURIComponent(course.slug)}`);
       return;
     }
-
-    try {
-      setPurchasing(true);
-      setPurchaseError(null);
-      const updated = await purchaseCourse(course.slug);
-      setCourse(updated);
-      setSuccessMessage('Course unlocked. You can now access the full curriculum.');
-    } catch (err) {
-      setPurchaseError(err instanceof Error ? err.message : 'Could not unlock course access.');
-    } finally {
-      setPurchasing(false);
-    }
+    router.push(`/checkout?product=${encodeURIComponent(course.slug)}`);
   }
 
   if (loading) {
@@ -269,17 +254,6 @@ export function CourseDetailsPage() {
             <div className="sticky top-24">
               <Card>
                 <div className="text-3xl text-indigo-600 mb-4">${course.price.toFixed(2)}</div>
-
-                {successMessage && (
-                  <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-                    {successMessage}
-                  </div>
-                )}
-                {purchaseError && (
-                  <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                    {purchaseError}
-                  </div>
-                )}
                 {error && (
                   <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                     {error}
@@ -291,8 +265,8 @@ export function CourseDetailsPage() {
                     Continue Learning
                   </Button>
                 ) : (
-                  <Button fullWidth size="lg" className="mb-3" onClick={handlePurchase} disabled={purchasing}>
-                    {purchasing ? 'Unlocking…' : 'Buy Now'}
+                  <Button fullWidth size="lg" className="mb-3" onClick={handleCheckoutRedirect}>
+                    Buy Now
                   </Button>
                 )}
 
@@ -301,7 +275,7 @@ export function CourseDetailsPage() {
                   variant="outline"
                   size="lg"
                   className="mb-6"
-                  onClick={() => router.push('/checkout')}
+                  onClick={handleCheckoutRedirect}
                 >
                   Go to Checkout
                 </Button>
