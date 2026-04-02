@@ -199,10 +199,23 @@ export function CheckoutPage() {
                     </div>
                   ))}
                 </div>
-                {quote?.shipping.deliveryAvailable === false && (
-                  <p className="mt-3 text-sm text-red-600">
-                    Delivery is not available to this PIN code right now.
-                  </p>
+                {quote?.shipping.message && (
+                  <div
+                    className={`mt-4 rounded-lg border px-4 py-3 text-sm ${
+                      quote.shipping.deliveryAvailable
+                        ? 'border-green-200 bg-green-50 text-green-800'
+                        : 'border-red-200 bg-red-50 text-red-700'
+                    }`}
+                  >
+                    <p>{quote.shipping.message}</p>
+                    {quote.shipping.deliveryAvailable && quote.shipping.estimatedDays ? (
+                      <p className="mt-1">
+                        Carrier: {quote.shipping.carrier} • Estimated delivery in {quote.shipping.estimatedDays} day
+                        {quote.shipping.estimatedDays === 1 ? '' : 's'}
+                        {quote.shipping.city ? ` to ${quote.shipping.city}` : ''}.
+                      </p>
+                    ) : null}
+                  </div>
                 )}
               </Card>
             )}
@@ -292,6 +305,18 @@ export function CheckoutPage() {
                 )}
               </div>
 
+              {requiresShipping && (
+                <Button
+                  fullWidth
+                  variant="outline"
+                  className="mb-4"
+                  onClick={() => void refreshQuote()}
+                  disabled={!shipping.pinCode.trim() || loading}
+                >
+                  Validate DTDC Delivery
+                </Button>
+              )}
+
               <div className="space-y-2 mb-4 pb-4 border-b border-slate-200">
                 <div className="flex justify-between text-sm">
                   <span>Subtotal</span>
@@ -299,7 +324,7 @@ export function CheckoutPage() {
                 </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
-                    <span>Discount (20%)</span>
+                    <span>Discount</span>
                     <span>-${discount.toFixed(2)}</span>
                   </div>
                 )}
@@ -310,7 +335,17 @@ export function CheckoutPage() {
                 <span className="text-indigo-600">${total.toFixed(2)}</span>
               </div>
 
-              <Button fullWidth size="lg" onClick={() => void handlePurchase()} disabled={loading || submitting || !productSlug}>
+              <Button
+                fullWidth
+                size="lg"
+                onClick={() => void handlePurchase()}
+                disabled={
+                  loading ||
+                  submitting ||
+                  !productSlug ||
+                  (requiresShipping && quote?.shipping.deliveryAvailable === false)
+                }
+              >
                 {submitting ? 'Processing…' : 'Complete Purchase'}
               </Button>
 

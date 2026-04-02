@@ -27,6 +27,8 @@ export type CourseSummary = {
   studentsCount: number;
   learningPoints: string[];
   requirements: string[];
+  finalQuizTitle: string | null;
+  finalQuizQuestionCount: number;
   status: CourseStatus;
   createdAt: string;
   updatedAt: string;
@@ -40,13 +42,23 @@ export type CourseDetail = CourseSummary & {
     id: string;
     title: string;
     position: number;
+    quizTitle: string | null;
+    quizQuestionCount: number;
     lectures: Array<{
       id: string;
       title: string;
       durationText: string;
+      videoUrl: string | null;
+      position: number;
       isPreview: boolean;
+      quizTitle: string | null;
+      quizQuestionCount: number;
     }>;
   }>;
+};
+
+export type AdminCourse = CourseSummary & {
+  sections: CourseDetail['sections'];
 };
 
 export type PurchasedCourse = CourseSummary & {
@@ -72,12 +84,26 @@ export type AdminCourseInput = {
   price: number;
   durationText: string;
   tag?: string | null;
-  previewLectureCount: number;
   accessType: CourseAccessType;
   accessMonths?: number | null;
   status: CourseStatus;
   learningPoints: string[];
   requirements: string[];
+  finalQuizTitle?: string | null;
+  finalQuizQuestionCount?: number;
+  sections: Array<{
+    title: string;
+    quizTitle?: string | null;
+    quizQuestionCount?: number;
+    lectures: Array<{
+      title: string;
+      durationText: string;
+      videoUrl?: string | null;
+      isPreview: boolean;
+      quizTitle?: string | null;
+      quizQuestionCount?: number;
+    }>;
+  }>;
 };
 
 async function parseJson<T>(res: Response): Promise<T> {
@@ -133,7 +159,16 @@ export async function fetchAdminCourses(): Promise<CourseSummary[]> {
   return (await parseJson<{ courses: CourseSummary[] }>(res)).courses;
 }
 
-export async function createAdminCourse(input: AdminCourseInput): Promise<CourseSummary> {
+export async function fetchAdminCourse(id: string): Promise<AdminCourse> {
+  const res = await fetch(`/api/admin/courses/${id}`, {
+    credentials: 'include',
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(await readAuthError(res));
+  return (await parseJson<{ course: AdminCourse }>(res)).course;
+}
+
+export async function createAdminCourse(input: AdminCourseInput): Promise<AdminCourse> {
   const res = await fetch('/api/admin/courses', {
     method: 'POST',
     credentials: 'include',
@@ -141,10 +176,10 @@ export async function createAdminCourse(input: AdminCourseInput): Promise<Course
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await readAuthError(res));
-  return (await parseJson<{ course: CourseSummary }>(res)).course;
+  return (await parseJson<{ course: AdminCourse }>(res)).course;
 }
 
-export async function updateAdminCourse(id: string, input: AdminCourseInput): Promise<CourseSummary> {
+export async function updateAdminCourse(id: string, input: AdminCourseInput): Promise<AdminCourse> {
   const res = await fetch(`/api/admin/courses/${id}`, {
     method: 'PATCH',
     credentials: 'include',
@@ -152,5 +187,5 @@ export async function updateAdminCourse(id: string, input: AdminCourseInput): Pr
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await readAuthError(res));
-  return (await parseJson<{ course: CourseSummary }>(res)).course;
+  return (await parseJson<{ course: AdminCourse }>(res)).course;
 }

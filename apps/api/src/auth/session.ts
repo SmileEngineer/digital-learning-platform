@@ -8,7 +8,32 @@ export type SessionUser = {
   name: string;
   role: string;
   phone: string | null;
+  admin_permissions: string[];
 };
+
+export const ADMIN_PERMISSION_KEYS = [
+  'courses',
+  'ebooks',
+  'books',
+  'live_classes',
+  'practice_exams',
+  'coupons',
+  'articles',
+  'orders',
+  'analytics',
+  'settings',
+  'admin_access',
+] as const;
+
+export type AdminPermission = (typeof ADMIN_PERMISSION_KEYS)[number];
+
+function isAdminRole(role: string): boolean {
+  return role === 'admin' || role === 'super_admin';
+}
+
+export function hasAdminPermission(user: SessionUser, permission: AdminPermission): boolean {
+  return user.role === 'super_admin' || user.admin_permissions.includes(permission);
+}
 
 function parseBearer(req: Request): string | null {
   const h = req.headers.authorization;
@@ -26,7 +51,7 @@ async function loadSessionUser(
   if (!payload) return null;
 
   const rows = await sql`
-    SELECT id, email, name, role, phone
+    SELECT id, email, name, role, phone, admin_permissions
     FROM users
     WHERE id = ${payload.sub}
     LIMIT 1
@@ -70,5 +95,34 @@ export async function requireSessionUser(
     return null;
   }
 
+  return user;
+}
+
+export async function requireAdminUser(
+  req: Request,
+  res: Response,
+  sql: NeonQueryFunction<false, false>
+): Promise<SessionUser | null> {
+  const user = await requireSessionUser(req, res, sql);
+  if (!user) return null;
+  if (!isAdminRole(user.role)) {
+    res.status(403).json({ error: 'Admin access is required.' });
+    return null;
+  }
+  return user;
+}
+
+export async function requireAdminPermission(
+  req: Request,
+  res: Response,
+  sql: NeonQueryFunction<false, false>,
+  permission: AdminPermission
+): Promise<SessionUser | null> {
+  const user = await requireAdminUser(req, res, sql);
+  if (!user) return null;
+  if (!hasAdminPermission(user, permission)) {
+    res.status(403).json({ error: 'You do not have permission to access this admin area.' });
+    return null;
+  }
   return user;
 }

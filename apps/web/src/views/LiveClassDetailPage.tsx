@@ -2,11 +2,23 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Calendar, Clock, Users, Video, Star } from 'lucide-react';
+import { AlertCircle, Calendar, Clock, Mail, Users, Video, Star } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { Card } from '../components/Card';
-import { fetchCatalogItem, fetchLearnerAccess, type CatalogItem } from '@/lib/platform-api';
+import { fetchCatalogItem, fetchLearnerAccess, joinLiveClass, type CatalogItem } from '@/lib/platform-api';
+
+function countdownParts(targetIso?: string, now = Date.now()) {
+  if (!targetIso) return null;
+  const diff = Math.max(0, new Date(targetIso).getTime() - now);
+  const totalSeconds = Math.floor(diff / 1000);
+  return {
+    days: Math.floor(totalSeconds / 86400),
+    hours: Math.floor((totalSeconds % 86400) / 3600),
+    minutes: Math.floor((totalSeconds % 3600) / 60),
+    seconds: totalSeconds % 60,
+  };
+}
 
 export function LiveClassDetailPage() {
   const params = useParams<{ id: string }>();
@@ -14,6 +26,9 @@ export function LiveClassDetailPage() {
   const slug = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const [item, setItem] = useState<CatalogItem | null>(null);
   const [hasAccess, setHasAccess] = useState(false);
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
     if (!slug) return;
@@ -34,19 +49,32 @@ export function LiveClassDetailPage() {
     };
   }, [slug]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const timeLeft = useMemo(() => {
-    if (!item?.date || !item.time) return null;
-    const target = item.scheduledAt ? new Date(item.scheduledAt) : null;
-    if (!target) return null;
-    const diff = Math.max(0, target.getTime() - Date.now());
-    const totalSeconds = Math.floor(diff / 1000);
-    return {
-      days: Math.floor(totalSeconds / 86400),
-      hours: Math.floor((totalSeconds % 86400) / 3600),
-      minutes: Math.floor((totalSeconds % 3600) / 60),
-      seconds: totalSeconds % 60,
-    };
-  }, [item]);
+    return countdownParts(item?.scheduledAt, now);
+  }, [item?.scheduledAt, now]);
+
+  const isCancelled = item?.liveClassStatus === 'cancelled';
+  const isRescheduled = item?.liveClassStatus === 'rescheduled';
+  const isSoldOut = (item?.spotsLeft ?? 1) <= 0;
+
+  async function handleJoin() {
+    if (!item) return;
+    try {
+      setJoining(true);
+      setJoinError(null);
+      const result = await joinLiveClass(item.slug);
+      window.location.assign(result.joinUrl);
+    } catch (err) {
+      setJoinError(err instanceof Error ? err.message : 'Could not validate live class access.');
+    } finally {
+      setJoining(false);
+    }
+  }
 
   if (!item) {
     return (
@@ -65,10 +93,19 @@ export function LiveClassDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
             <div className="mb-6">
-              {item.spotsLeft !== undefined && item.spotsLeft < 10 && (
+              {isCancelled ? (
+                <Badge variant="error" className="mb-3">
+                  Cancelled
+                </Badge>
+              ) : item.spotsLeft !== undefined && item.spotsLeft < 10 ? (
                 <Badge variant="warning" className="mb-3">
                   Only {item.spotsLeft} spots left
                 </Badge>
+              ) : null}
+              {isRescheduled && (
+                <div className="mb-3">
+                  <Badge variant="info">Rescheduled</Badge>
+                </div>
               )}
               <h1 className="text-4xl mb-3">{item.title}</h1>
               <p className="text-lg text-slate-600 mb-4">{item.description}</p>
@@ -99,9 +136,23 @@ export function LiveClassDetailPage() {
               <img src={item.image} alt={item.title} className="w-full h-96 object-cover rounded-lg" />
             </div>
 
+            {isCancelled && (
+              <Card className="mb-8 border-red-200 bg-red-50">
+                <div className="flex gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+                  <div>
+                    <h2 className="text-lg text-red-800 mb-1">This live class has been cancelled</h2>
+                    <p className="text-sm text-red-700">
+                      {item.cancellationReason ?? 'The admin has cancelled this session. Purchased learners can be refunded from the admin panel.'}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            )}
+
             {timeLeft && (
               <Card className="mb-8 bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200">
-                <h2 className="text-2xl mb-4 text-indigo-900">Class Starts In</h2>
+                <h2 className="text-2xl mb-4 text-indigo-900">{timeLeft.days || timeLeft.hours || timeLeft.minutes || timeLeft.seconds ? 'Class Starts In' : 'Meeting Window'}</h2>
                 <div className="grid grid-cols-4 gap-4">
                   {Object.entries(timeLeft).map(([unit, value]) => (
                     <div key={unit} className="text-center">
@@ -143,7 +194,15 @@ export function LiveClassDetailPage() {
                     )}
                     <div className="flex items-center gap-2">
                       <Video className="w-4 h-4" />
-                      <span>Google Meet style access flow</span>
+                      <span>{item.meetingProvider === 'google_meet' ? 'Google Meet' : item.meetingProvider ?? 'Live meeting'} access</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4" />
+                      <span>
+                        {item.registeredEmailRequired === false
+                          ? 'Meeting access is tied to your purchase'
+                          : 'Meeting access is validated against your registered email'}
+                      </span>
                     </div>
                   </div>
                   <p className="text-slate-700">
@@ -158,23 +217,43 @@ export function LiveClassDetailPage() {
             <div className="sticky top-24">
               <Card>
                 <div className="text-3xl text-indigo-600 mb-4">${item.price.toFixed(2)}</div>
+                {joinError && (
+                  <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {joinError}
+                  </div>
+                )}
 
-                <Button
-                  fullWidth
-                  size="lg"
-                  className="mb-3"
-                  onClick={() => router.push(hasAccess ? '/dashboard/live-classes' : `/checkout?product=${item.slug}`)}
-                >
-                  {hasAccess ? 'Open in Dashboard' : 'Enroll Now'}
-                </Button>
+                {hasAccess ? (
+                  <Button fullWidth size="lg" className="mb-3" onClick={() => void handleJoin()} disabled={joining || isCancelled}>
+                    {joining ? 'Checking access...' : isCancelled ? 'Class Cancelled' : 'Join Live Class'}
+                  </Button>
+                ) : (
+                  <Button
+                    fullWidth
+                    size="lg"
+                    className="mb-3"
+                    onClick={() => router.push(`/checkout?product=${item.slug}`)}
+                    disabled={isCancelled || isSoldOut}
+                  >
+                    {isCancelled ? 'Unavailable' : isSoldOut ? 'Sold Out' : 'Enroll Now'}
+                  </Button>
+                )}
+
+                {hasAccess && (
+                  <Button fullWidth variant="outline" size="lg" className="mb-3" onClick={() => router.push('/dashboard/live-classes')}>
+                    Open in Dashboard
+                  </Button>
+                )}
 
                 <div className="text-center text-sm text-slate-600 mb-6">
-                  {item.spotsLeft !== undefined && item.spotsLeft < 10 ? (
+                  {isCancelled ? (
+                    'This class is no longer accepting attendees.'
+                  ) : item.spotsLeft !== undefined && item.spotsLeft < 10 ? (
                     <Badge variant="warning" size="sm">
                       Only {item.spotsLeft} spots left
                     </Badge>
                   ) : (
-                    'Meeting access is restricted to enrolled users.'
+                    'Only enrolled users can join at the scheduled time.'
                   )}
                 </div>
 

@@ -1,17 +1,35 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Edit, Plus, RefreshCw } from 'lucide-react';
+import { Edit, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/Badge';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import {
   createAdminCourse,
+  fetchAdminCourse,
   fetchAdminCourses,
   updateAdminCourse,
+  type AdminCourse,
   type AdminCourseInput,
   type CourseSummary,
 } from '@/lib/course-api';
+
+type LectureFormState = {
+  title: string;
+  durationText: string;
+  videoUrl: string;
+  isPreview: boolean;
+  quizTitle: string;
+  quizQuestionCount: string;
+};
+
+type SectionFormState = {
+  title: string;
+  quizTitle: string;
+  quizQuestionCount: string;
+  lectures: LectureFormState[];
+};
 
 type FormState = {
   title: string;
@@ -27,37 +45,63 @@ type FormState = {
   price: string;
   durationText: string;
   tag: string;
-  previewLectureCount: string;
   accessType: 'lifetime' | 'fixed_months';
   accessMonths: string;
   status: 'draft' | 'published';
   learningPointsText: string;
   requirementsText: string;
+  finalQuizTitle: string;
+  finalQuizQuestionCount: string;
+  sections: SectionFormState[];
 };
 
-const emptyForm: FormState = {
-  title: '',
-  slug: '',
-  shortDescription: '',
-  description: '',
-  instructorName: '',
-  imageUrl: '',
-  category: '',
-  stateName: '',
-  universityName: '',
-  semesterLabel: '',
-  price: '0',
-  durationText: '',
-  tag: '',
-  previewLectureCount: '1',
-  accessType: 'lifetime',
-  accessMonths: '',
-  status: 'published',
-  learningPointsText: '',
-  requirementsText: '',
-};
+function emptyLecture(): LectureFormState {
+  return {
+    title: '',
+    durationText: '',
+    videoUrl: '',
+    isPreview: false,
+    quizTitle: '',
+    quizQuestionCount: '0',
+  };
+}
 
-function toFormState(course: CourseSummary): FormState {
+function emptySection(): SectionFormState {
+  return {
+    title: '',
+    quizTitle: '',
+    quizQuestionCount: '0',
+    lectures: [emptyLecture()],
+  };
+}
+
+function createEmptyForm(): FormState {
+  return {
+    title: '',
+    slug: '',
+    shortDescription: '',
+    description: '',
+    instructorName: '',
+    imageUrl: '',
+    category: '',
+    stateName: '',
+    universityName: '',
+    semesterLabel: '',
+    price: '0',
+    durationText: '',
+    tag: '',
+    accessType: 'lifetime',
+    accessMonths: '',
+    status: 'published',
+    learningPointsText: '',
+    requirementsText: '',
+    finalQuizTitle: '',
+    finalQuizQuestionCount: '0',
+    sections: [emptySection()],
+  };
+}
+
+function toFormState(course: AdminCourse): FormState {
   return {
     title: course.title,
     slug: course.slug,
@@ -72,12 +116,32 @@ function toFormState(course: CourseSummary): FormState {
     price: String(course.price),
     durationText: course.durationText,
     tag: course.tag ?? '',
-    previewLectureCount: String(course.previewLectureCount),
     accessType: course.accessType,
     accessMonths: course.accessMonths ? String(course.accessMonths) : '',
     status: course.status,
     learningPointsText: course.learningPoints.join('\n'),
     requirementsText: course.requirements.join('\n'),
+    finalQuizTitle: course.finalQuizTitle ?? '',
+    finalQuizQuestionCount: String(course.finalQuizQuestionCount),
+    sections:
+      course.sections.length > 0
+        ? course.sections.map((section) => ({
+            title: section.title,
+            quizTitle: section.quizTitle ?? '',
+            quizQuestionCount: String(section.quizQuestionCount),
+            lectures:
+              section.lectures.length > 0
+                ? section.lectures.map((lecture) => ({
+                    title: lecture.title,
+                    durationText: lecture.durationText,
+                    videoUrl: lecture.videoUrl ?? '',
+                    isPreview: lecture.isPreview,
+                    quizTitle: lecture.quizTitle ?? '',
+                    quizQuestionCount: String(lecture.quizQuestionCount),
+                  }))
+                : [emptyLecture()],
+          }))
+        : [emptySection()],
   };
 }
 
@@ -103,12 +167,26 @@ function toPayload(form: FormState): AdminCourseInput {
     price: Number(form.price),
     durationText: form.durationText.trim(),
     tag: form.tag.trim() || null,
-    previewLectureCount: Number(form.previewLectureCount),
     accessType: form.accessType,
     accessMonths: form.accessType === 'fixed_months' ? Number(form.accessMonths) || null : null,
     status: form.status,
     learningPoints: splitLines(form.learningPointsText),
     requirements: splitLines(form.requirementsText),
+    finalQuizTitle: form.finalQuizTitle.trim() || null,
+    finalQuizQuestionCount: Number(form.finalQuizQuestionCount) || 0,
+    sections: form.sections.map((section) => ({
+      title: section.title.trim(),
+      quizTitle: section.quizTitle.trim() || null,
+      quizQuestionCount: Number(section.quizQuestionCount) || 0,
+      lectures: section.lectures.map((lecture) => ({
+        title: lecture.title.trim(),
+        durationText: lecture.durationText.trim(),
+        videoUrl: lecture.videoUrl.trim() || null,
+        isPreview: lecture.isPreview,
+        quizTitle: lecture.quizTitle.trim() || null,
+        quizQuestionCount: Number(lecture.quizQuestionCount) || 0,
+      })),
+    })),
   };
 }
 
@@ -116,10 +194,11 @@ export function CourseManagementPage() {
   const [courses, setCourses] = useState<CourseSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(emptyForm);
+  const [form, setForm] = useState<FormState>(createEmptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
 
   async function loadCourses() {
     try {
@@ -144,6 +223,20 @@ export function CourseManagementPage() {
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       ),
     [courses]
+  );
+
+  const totalLectures = useMemo(
+    () => form.sections.reduce((sum, section) => sum + section.lectures.length, 0),
+    [form.sections]
+  );
+
+  const previewLectureCount = useMemo(
+    () =>
+      form.sections.reduce(
+        (sum, section) => sum + section.lectures.filter((lecture) => lecture.isPreview).length,
+        0
+      ),
+    [form.sections]
   );
 
   async function handleSubmit(e: React.FormEvent) {
@@ -174,9 +267,31 @@ export function CourseManagementPage() {
 
   function beginCreate() {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm(createEmptyForm());
     setMessage(null);
     setError(null);
+  }
+
+  async function beginEdit(courseId: string) {
+    try {
+      setLoadingDetailId(courseId);
+      setMessage(null);
+      setError(null);
+      const course = await fetchAdminCourse(courseId);
+      setEditingId(course.id);
+      setForm(toFormState(course));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load course details.');
+    } finally {
+      setLoadingDetailId(null);
+    }
+  }
+
+  function updateSection(index: number, next: SectionFormState) {
+    setForm((current) => ({
+      ...current,
+      sections: current.sections.map((section, sectionIndex) => (sectionIndex === index ? next : section)),
+    }));
   }
 
   return (
@@ -185,7 +300,7 @@ export function CourseManagementPage() {
         <div>
           <h1 className="text-3xl">Manage Courses</h1>
           <p className="text-slate-600 mt-2">
-            Create and update live course metadata, preview rules, and access duration.
+            Manage course curriculum, preview lectures, lecture videos, quizzes, and access validity.
           </p>
         </div>
         <div className="flex gap-3">
@@ -204,6 +319,11 @@ export function CourseManagementPage() {
         <h2 className="text-xl mb-4">{editingId ? 'Edit Course' : 'Create Course'}</h2>
         {message && <p className="mb-4 text-sm text-green-700">{message}</p>}
         {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+        <div className="mb-4 flex flex-wrap gap-3 text-sm text-slate-600">
+          <span>{totalLectures} total lectures</span>
+          <span>•</span>
+          <span>{previewLectureCount} preview lectures</span>
+        </div>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -336,19 +456,6 @@ export function CourseManagementPage() {
               />
             </label>
             <label className="block">
-              <span className="mb-2 block text-sm text-slate-700">Preview lectures</span>
-              <input
-                type="number"
-                min="0"
-                value={form.previewLectureCount}
-                onChange={(e) =>
-                  setForm((current) => ({ ...current, previewLectureCount: e.target.value }))
-                }
-                className="w-full rounded-lg border border-slate-300 px-4 py-2"
-                required
-              />
-            </label>
-            <label className="block">
               <span className="mb-2 block text-sm text-slate-700">Status</span>
               <select
                 value={form.status}
@@ -393,6 +500,29 @@ export function CourseManagementPage() {
                 className="w-full rounded-lg border border-slate-300 px-4 py-2 disabled:bg-slate-100"
               />
             </label>
+            <label className="block">
+              <span className="mb-2 block text-sm text-slate-700">Final quiz title</span>
+              <input
+                value={form.finalQuizTitle}
+                onChange={(e) =>
+                  setForm((current) => ({ ...current, finalQuizTitle: e.target.value }))
+                }
+                className="w-full rounded-lg border border-slate-300 px-4 py-2"
+                placeholder="Optional"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-sm text-slate-700">Final quiz question count</span>
+              <input
+                type="number"
+                min="0"
+                value={form.finalQuizQuestionCount}
+                onChange={(e) =>
+                  setForm((current) => ({ ...current, finalQuizQuestionCount: e.target.value }))
+                }
+                className="w-full rounded-lg border border-slate-300 px-4 py-2"
+              />
+            </label>
             <label className="block md:col-span-2">
               <span className="mb-2 block text-sm text-slate-700">Learning points</span>
               <textarea
@@ -415,6 +545,240 @@ export function CourseManagementPage() {
                 placeholder="One requirement per line"
               />
             </label>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg">Curriculum</h3>
+                <p className="text-sm text-slate-500">
+                  Add sections, lectures, preview flags, lecture video URLs, and quiz metadata.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  setForm((current) => ({
+                    ...current,
+                    sections: [...current.sections, emptySection()],
+                  }))
+                }
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Section
+              </Button>
+            </div>
+
+            <div className="space-y-6">
+              {form.sections.map((section, sectionIndex) => (
+                <div key={`section-${sectionIndex}`} className="rounded-lg border border-slate-200 p-4">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h4 className="text-base">Section {sectionIndex + 1}</h4>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() =>
+                        setForm((current) => ({
+                          ...current,
+                          sections:
+                            current.sections.length === 1
+                              ? [emptySection()]
+                              : current.sections.filter((_, index) => index !== sectionIndex),
+                        }))
+                      }
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Remove Section
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <label className="block">
+                      <span className="mb-2 block text-sm text-slate-700">Section title</span>
+                      <input
+                        value={section.title}
+                        onChange={(e) =>
+                          updateSection(sectionIndex, { ...section, title: e.target.value })
+                        }
+                        className="w-full rounded-lg border border-slate-300 px-4 py-2"
+                        required
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="mb-2 block text-sm text-slate-700">Section quiz title</span>
+                      <input
+                        value={section.quizTitle}
+                        onChange={(e) =>
+                          updateSection(sectionIndex, { ...section, quizTitle: e.target.value })
+                        }
+                        className="w-full rounded-lg border border-slate-300 px-4 py-2"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="mb-2 block text-sm text-slate-700">Section quiz questions</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={section.quizQuestionCount}
+                        onChange={(e) =>
+                          updateSection(sectionIndex, {
+                            ...section,
+                            quizQuestionCount: e.target.value,
+                          })
+                        }
+                        className="w-full rounded-lg border border-slate-300 px-4 py-2"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="space-y-4">
+                    {section.lectures.map((lecture, lectureIndex) => (
+                      <div key={`lecture-${lectureIndex}`} className="rounded-lg border border-slate-100 bg-slate-50 p-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <h5 className="text-sm font-medium text-slate-700">
+                            Lecture {lectureIndex + 1}
+                          </h5>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() =>
+                              updateSection(sectionIndex, {
+                                ...section,
+                                lectures:
+                                  section.lectures.length === 1
+                                    ? [emptyLecture()]
+                                    : section.lectures.filter((_, index) => index !== lectureIndex),
+                              })
+                            }
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Remove Lecture
+                          </Button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <label className="block">
+                            <span className="mb-2 block text-sm text-slate-700">Lecture title</span>
+                            <input
+                              value={lecture.title}
+                              onChange={(e) =>
+                                updateSection(sectionIndex, {
+                                  ...section,
+                                  lectures: section.lectures.map((item, index) =>
+                                    index === lectureIndex ? { ...item, title: e.target.value } : item
+                                  ),
+                                })
+                              }
+                              className="w-full rounded-lg border border-slate-300 px-4 py-2"
+                              required
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="mb-2 block text-sm text-slate-700">Duration</span>
+                            <input
+                              value={lecture.durationText}
+                              onChange={(e) =>
+                                updateSection(sectionIndex, {
+                                  ...section,
+                                  lectures: section.lectures.map((item, index) =>
+                                    index === lectureIndex
+                                      ? { ...item, durationText: e.target.value }
+                                      : item
+                                  ),
+                                })
+                              }
+                              className="w-full rounded-lg border border-slate-300 px-4 py-2"
+                              placeholder="12:30"
+                              required
+                            />
+                          </label>
+                          <label className="block md:col-span-2">
+                            <span className="mb-2 block text-sm text-slate-700">Video URL / Embed URL</span>
+                            <input
+                              value={lecture.videoUrl}
+                              onChange={(e) =>
+                                updateSection(sectionIndex, {
+                                  ...section,
+                                  lectures: section.lectures.map((item, index) =>
+                                    index === lectureIndex ? { ...item, videoUrl: e.target.value } : item
+                                  ),
+                                })
+                              }
+                              className="w-full rounded-lg border border-slate-300 px-4 py-2"
+                              placeholder="https://www.youtube.com/embed/..."
+                            />
+                          </label>
+                          <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
+                            <input
+                              type="checkbox"
+                              checked={lecture.isPreview}
+                              onChange={(e) =>
+                                updateSection(sectionIndex, {
+                                  ...section,
+                                  lectures: section.lectures.map((item, index) =>
+                                    index === lectureIndex ? { ...item, isPreview: e.target.checked } : item
+                                  ),
+                                })
+                              }
+                            />
+                            <span className="text-sm text-slate-700">Mark this lecture as preview</span>
+                          </label>
+                          <label className="block">
+                            <span className="mb-2 block text-sm text-slate-700">Lecture quiz title</span>
+                            <input
+                              value={lecture.quizTitle}
+                              onChange={(e) =>
+                                updateSection(sectionIndex, {
+                                  ...section,
+                                  lectures: section.lectures.map((item, index) =>
+                                    index === lectureIndex ? { ...item, quizTitle: e.target.value } : item
+                                  ),
+                                })
+                              }
+                              className="w-full rounded-lg border border-slate-300 px-4 py-2"
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="mb-2 block text-sm text-slate-700">Lecture quiz questions</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={lecture.quizQuestionCount}
+                              onChange={(e) =>
+                                updateSection(sectionIndex, {
+                                  ...section,
+                                  lectures: section.lectures.map((item, index) =>
+                                    index === lectureIndex
+                                      ? { ...item, quizQuestionCount: e.target.value }
+                                      : item
+                                  ),
+                                })
+                              }
+                              className="w-full rounded-lg border border-slate-300 px-4 py-2"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() =>
+                        updateSection(sectionIndex, {
+                          ...section,
+                          lectures: [...section.lectures, emptyLecture()],
+                        })
+                      }
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Lecture
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="flex gap-3">
@@ -480,15 +844,10 @@ export function CourseManagementPage() {
                     <td className="px-6 py-4">
                       <button
                         className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
-                        onClick={() => {
-                          setEditingId(course.id);
-                          setForm(toFormState(course));
-                          setMessage(null);
-                          setError(null);
-                        }}
+                        onClick={() => void beginEdit(course.id)}
                       >
                         <Edit className="w-4 h-4" />
-                        Edit
+                        {loadingDetailId === course.id ? 'Loading…' : 'Edit'}
                       </button>
                     </td>
                   </tr>

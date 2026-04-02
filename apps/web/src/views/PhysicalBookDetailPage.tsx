@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Package, Truck, Star } from 'lucide-react';
+import { MapPin, Package, Truck, Star } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { Card } from '../components/Card';
-import { fetchCatalogItem, type CatalogItem } from '@/lib/platform-api';
+import { fetchCatalogItem, fetchDeliveryCheck, type CatalogItem, type DeliveryCheck } from '@/lib/platform-api';
 
 export function PhysicalBookDetailPage() {
   const params = useParams<{ id: string }>();
@@ -14,6 +14,9 @@ export function PhysicalBookDetailPage() {
   const slug = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const [item, setItem] = useState<CatalogItem | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pinCode, setPinCode] = useState('');
+  const [delivery, setDelivery] = useState<DeliveryCheck | null>(null);
+  const [checkingPin, setCheckingPin] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
@@ -45,6 +48,20 @@ export function PhysicalBookDetailPage() {
   }
 
   const stock = item.stock ?? 0;
+
+  async function handleCheckDelivery() {
+    if (!slug || !pinCode.trim()) return;
+    try {
+      setCheckingPin(true);
+      const result = await fetchDeliveryCheck(slug, pinCode.trim());
+      setDelivery(result);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not validate delivery.');
+    } finally {
+      setCheckingPin(false);
+    }
+  }
 
   return (
     <div className="py-8">
@@ -112,6 +129,40 @@ export function PhysicalBookDetailPage() {
                   </p>
                 </div>
               </div>
+            </Card>
+
+            <Card className="mt-8">
+              <h2 className="text-2xl mb-4">Check DTDC Delivery</h2>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="text"
+                  value={pinCode}
+                  onChange={(e) => setPinCode(e.target.value)}
+                  placeholder="Enter 6-digit PIN code"
+                  className="flex-1 rounded-lg border border-slate-300 px-4 py-2"
+                />
+                <Button onClick={() => void handleCheckDelivery()} disabled={checkingPin || !pinCode.trim()}>
+                  <MapPin className="w-4 h-4 mr-2" />
+                  {checkingPin ? 'Checking…' : 'Validate Delivery'}
+                </Button>
+              </div>
+              {delivery && (
+                <div
+                  className={`mt-4 rounded-lg border px-4 py-3 text-sm ${
+                    delivery.available
+                      ? 'border-green-200 bg-green-50 text-green-800'
+                      : 'border-red-200 bg-red-50 text-red-700'
+                  }`}
+                >
+                  <p>{delivery.message}</p>
+                  {delivery.available && (
+                    <p className="mt-2">
+                      Estimated delivery: {delivery.estimatedDays} day{delivery.estimatedDays === 1 ? '' : 's'}
+                      {delivery.city ? ` to ${delivery.city}` : ''}.
+                    </p>
+                  )}
+                </div>
+              )}
             </Card>
           </div>
 

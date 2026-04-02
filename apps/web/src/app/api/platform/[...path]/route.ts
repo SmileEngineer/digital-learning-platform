@@ -42,3 +42,7 @@ export async function GET(req: NextRequest, context: { params: Promise<Params> }
 export async function POST(req: NextRequest, context: { params: Promise<Params> }) {
   return proxy(req, context.params);
 }
+
+export async function PATCH(req: NextRequest, context: { params: Promise<Params> }) {
+  return proxy(req, context.params);
+}

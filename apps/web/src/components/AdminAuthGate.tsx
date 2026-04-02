@@ -1,12 +1,34 @@
 'use client';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+
+const routePermissions: Array<{ prefix: string; permission: string }> = [
+  { prefix: '/admin/courses', permission: 'courses' },
+  { prefix: '/admin/ebooks', permission: 'ebooks' },
+  { prefix: '/admin/books', permission: 'books' },
+  { prefix: '/admin/live-classes', permission: 'live_classes' },
+  { prefix: '/admin/practice-exams', permission: 'practice_exams' },
+  { prefix: '/admin/coupons', permission: 'coupons' },
+  { prefix: '/admin/articles', permission: 'articles' },
+  { prefix: '/admin/orders', permission: 'orders' },
+  { prefix: '/admin/analytics', permission: 'analytics' },
+  { prefix: '/admin/settings', permission: 'settings' },
+  { prefix: '/admin/admin-access', permission: 'admin_access' },
+];
+
+function canAccessAdminPath(pathname: string, user: { role: string; adminPermissions?: string[] }) {
+  if (user.role === 'super_admin') return true;
+  const match = routePermissions.find((entry) => pathname.startsWith(entry.prefix));
+  if (!match) return true;
+  return (user.adminPermissions ?? []).includes(match.permission);
+}
 
 export function AdminAuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (loading) return;
@@ -16,8 +38,12 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
     }
     if (user.role !== 'admin' && user.role !== 'super_admin') {
       router.replace('/dashboard');
+      return;
     }
-  }, [loading, router, user]);
+    if (!canAccessAdminPath(pathname, user)) {
+      router.replace('/admin');
+    }
+  }, [loading, pathname, router, user]);
 
   if (loading) {
     return (
@@ -27,7 +53,7 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+  if (!user || (user.role !== 'admin' && user.role !== 'super_admin') || !canAccessAdminPath(pathname, user)) {
     return null;
   }
 

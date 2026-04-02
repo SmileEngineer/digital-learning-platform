@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation';
 import { Download, Eye, FileText } from 'lucide-react';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
-import { fetchLearnerLibrary, type LearnerLibraryItem } from '@/lib/platform-api';
+import { fetchLearnerLibrary, requestEbookDownload, type LearnerLibraryItem } from '@/lib/platform-api';
+import { buildQrCodeDataUrl, createWatermarkedEbookHtml, triggerHtmlDownload } from '@/lib/ebook-reader';
 
 export function MyEbooksPage() {
   const router = useRouter();
   const [ebooks, setEbooks] = useState<LearnerLibraryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [downloadingSlug, setDownloadingSlug] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,6 +31,30 @@ export function MyEbooksPage() {
     };
   }, []);
 
+  async function handleDownload(slug: string) {
+    try {
+      setDownloadingSlug(slug);
+      setError(null);
+      const payload = await requestEbookDownload(slug);
+      const message =
+        payload.downloadConfirmationMessage ??
+        'This eBook will be exported with your watermark on every page. Continue?';
+      if (!window.confirm(message)) return;
+      const qr = await buildQrCodeDataUrl(payload.qrValue);
+      const html = createWatermarkedEbookHtml({
+        title: payload.item.title,
+        pages: payload.pages,
+        watermarkText: payload.watermarkText,
+        qrCodeDataUrl: qr,
+      });
+      triggerHtmlDownload(payload.filename, html);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not download ebook.');
+    } finally {
+      setDownloadingSlug(null);
+    }
+  }
+
   return (
     <div>
       <h1 className="text-3xl mb-8">My eBooks & PDFs</h1>
@@ -46,9 +72,17 @@ export function MyEbooksPage() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button size="sm" disabled={!ebook.downloadAllowed}>
+                <Button
+                  size="sm"
+                  disabled={!ebook.downloadAllowed || downloadingSlug === ebook.slug}
+                  onClick={() => handleDownload(ebook.slug)}
+                >
                   <Download className="w-4 h-4 mr-2" />
-                  {ebook.downloadAllowed ? 'Download' : 'Locked'}
+                  {ebook.downloadAllowed
+                    ? downloadingSlug === ebook.slug
+                      ? 'Preparing…'
+                      : 'Download'
+                    : 'Locked'}
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => router.push(`/ebooks/${ebook.slug}`)}>
                   <Eye className="w-4 h-4 mr-2" />

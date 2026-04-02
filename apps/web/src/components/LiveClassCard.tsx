@@ -14,6 +14,7 @@ interface LiveClassCardProps {
   duration: string;
   instructor: string;
   spotsLeft?: number;
+  liveClassStatus?: string;
 }
 
 export function LiveClassCard({
@@ -27,7 +28,10 @@ export function LiveClassCard({
   duration,
   instructor,
   spotsLeft,
+  liveClassStatus,
 }: LiveClassCardProps) {
+  const isCancelled = liveClassStatus === 'cancelled';
+  const isRescheduled = liveClassStatus === 'rescheduled';
   return (
     <Link href={`/live-classes/${id}`} className="group">
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-200">
@@ -37,13 +41,17 @@ export function LiveClassCard({
             alt={title} 
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
           />
-          {spotsLeft && spotsLeft < 10 && (
+          {isCancelled ? (
+            <div className="absolute top-3 left-3">
+              <Badge variant="error">Cancelled</Badge>
+            </div>
+          ) : spotsLeft && spotsLeft < 10 ? (
             <div className="absolute top-3 left-3">
               <Badge variant="warning">
                 Only {spotsLeft} spots left
               </Badge>
             </div>
-          )}
+          ) : null}
         </div>
         
         <div className="p-4">
@@ -62,10 +70,15 @@ export function LiveClassCard({
           </div>
           
           <p className="text-sm text-slate-600 mb-3">with {instructor}</p>
+          {isRescheduled && (
+            <div className="mb-3">
+              <Badge variant="info">Rescheduled</Badge>
+            </div>
+          )}
           
           <div className="flex items-center justify-between">
             <span className="text-2xl text-indigo-600">${price}</span>
-            <Button size="sm">Enroll Now</Button>
+            <Button size="sm">{isCancelled ? 'View Details' : 'Enroll Now'}</Button>
           </div>
         </div>
       </div>

@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import { getSessionUser, requireSessionUser } from '../auth/session.js';
+import { notifyUser } from '../notifications.js';
 import { addDays, asMoney, getCatalogItemBySlug, mapCatalogItem } from '../platform.js';
+import { lookupDeliveryAvailability } from '../shipping.js';
 
 type CheckoutBody = {
   product?: string;
@@ -38,10 +40,6 @@ type CourseAccessRow = {
   access_months: number | null;
 };
 
-function validateBookPin(pin: string): boolean {
-  return /^\d{6}$/.test(pin) && !pin.startsWith('0');
-}
-
 function createOrderNumber(): string {
   const stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 14);
   const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
@@ -57,6 +55,10 @@ function addMonths(months: number | null): Date | null {
 
 function roundMoney(value: number): number {
   return Number(value.toFixed(2));
+}
+
+function getLiveClassStatus(metadata: Record<string, unknown> | null): string {
+  return typeof metadata?.liveClassStatus === 'string' ? metadata.liveClassStatus : 'scheduled';
 }
 
 function computeDiscount(
@@ -139,6 +141,16 @@ export function createCheckoutRouter(sql: NeonQueryFunction<false, false>): Rout
         res.status(400).json({ error: 'This book is currently out of stock.' });
         return;
       }
+      if (item.type === 'live_class') {
+        if (getLiveClassStatus(item.metadata) === 'cancelled') {
+          res.status(400).json({ error: 'This live class has been cancelled and can no longer be purchased.' });
+          return;
+        }
+        if (item.spots_remaining !== null && item.spots_remaining <= 0) {
+          res.status(400).json({ error: 'This live class is sold out.' });
+          return;
+        }
+      }
 
       const coupon = await loadCoupon(sql, body.couponCode);
       const subtotal = roundMoney(asMoney(item.price) * quantity);
@@ -147,13 +159,26 @@ export function createCheckoutRouter(sql: NeonQueryFunction<false, false>): Rout
 
       const requiresShipping = item.type === 'physical_book';
       const pinCode = body.shipping?.pinCode?.trim() ?? '';
-      const deliveryAvailable = requiresShipping && pinCode ? validateBookPin(pinCode) : undefined;
+      const delivery =
+        requiresShipping && pinCode ? await lookupDeliveryAvailability(sql, pinCode) : null;
 
       res.json({
         item: mapCatalogItem(item),
         pricing: { quantity, subtotal, discount, total, currency: item.currency },
         coupon: coupon ? { code: coupon.code, applied: discount > 0 } : null,
-        shipping: requiresShipping ? { required: true, deliveryAvailable } : { required: false },
+        shipping: requiresShipping
+          ? {
+              required: true,
+              deliveryAvailable: delivery?.available,
+              carrier: delivery?.carrier,
+              city: delivery?.city,
+              state: delivery?.state,
+              estimatedDays: delivery?.estimatedDays,
+              pinCode: delivery?.pinCode,
+              message: delivery?.message,
+              trackingBaseUrl: delivery?.trackingBaseUrl,
+            }
+          : { required: false },
       });
     } catch (e) {
       console.error('checkout.quote', e);
@@ -184,6 +209,16 @@ export function createCheckoutRouter(sql: NeonQueryFunction<false, false>): Rout
         res.status(400).json({ error: 'This book is currently out of stock.' });
         return;
       }
+      if (item.type === 'live_class') {
+        if (getLiveClassStatus(item.metadata) === 'cancelled') {
+          res.status(400).json({ error: 'This live class has been cancelled and can no longer be purchased.' });
+          return;
+        }
+        if (item.spots_remaining !== null && item.spots_remaining <= 0) {
+          res.status(400).json({ error: 'This live class is sold out.' });
+          return;
+        }
+      }
 
       if (item.type === 'physical_book') {
         const shipping = body.shipping;
@@ -197,8 +232,9 @@ export function createCheckoutRouter(sql: NeonQueryFunction<false, false>): Rout
           res.status(400).json({ error: 'Shipping details are required for physical books.' });
           return;
         }
-        if (!validateBookPin(shipping.pinCode.trim())) {
-          res.status(400).json({ error: 'Delivery is not available for this PIN code yet.' });
+        const delivery = await lookupDeliveryAvailability(sql, shipping.pinCode.trim());
+        if (!delivery.available) {
+          res.status(400).json({ error: delivery.message });
           return;
         }
       }
@@ -209,6 +245,11 @@ export function createCheckoutRouter(sql: NeonQueryFunction<false, false>): Rout
       const total = roundMoney(Math.max(0, subtotal - discount));
       const orderNumber = createOrderNumber();
       const courseAccess = item.type === 'course' ? await loadCourseAccess(sql, item.slug) : null;
+      const delivery =
+        item.type === 'physical_book' ? await lookupDeliveryAvailability(sql, body.shipping!.pinCode!.trim()) : null;
+      const billingName = item.type === 'physical_book' ? body.shipping?.fullName ?? user.name : user.name;
+      const billingEmail = item.type === 'physical_book' ? body.shipping?.email ?? user.email : user.email;
+      const billingPhone = item.type === 'physical_book' ? body.shipping?.phone ?? user.phone : user.phone;
 
       const orderRows = await sql`
         INSERT INTO orders (
@@ -239,9 +280,9 @@ export function createCheckoutRouter(sql: NeonQueryFunction<false, false>): Rout
           ${discount},
           ${total},
           ${coupon?.code ?? null},
-          ${user.name},
-          ${user.email},
-          ${user.phone}
+          ${billingName},
+          ${billingEmail},
+          ${billingPhone}
         )
         RETURNING id, order_number
       `;
@@ -295,6 +336,7 @@ export function createCheckoutRouter(sql: NeonQueryFunction<false, false>): Rout
             state,
             pin_code,
             delivery_available,
+            carrier,
             shipment_status
           )
           VALUES (
@@ -307,7 +349,8 @@ export function createCheckoutRouter(sql: NeonQueryFunction<false, false>): Rout
             ${shipping.city ?? null},
             ${shipping.state ?? null},
             ${shipping.pinCode!},
-            TRUE,
+            ${delivery?.available ?? false},
+            ${delivery?.carrier ?? 'DTDC'},
             'processing'
           )
         `;
@@ -368,6 +411,39 @@ export function createCheckoutRouter(sql: NeonQueryFunction<false, false>): Rout
             DO UPDATE
             SET access_expires_at = EXCLUDED.access_expires_at
           `;
+        }
+
+        if (item.type === 'live_class') {
+          await sql`
+            UPDATE catalog_items
+            SET
+              spots_remaining = CASE
+                WHEN spots_remaining IS NULL THEN NULL
+                ELSE GREATEST(spots_remaining - 1, 0)
+              END,
+              students_count = students_count + 1,
+              updated_at = NOW()
+            WHERE id = ${item.id}
+          `;
+
+          await notifyUser(sql, {
+            userId: user.id,
+            email: user.email,
+            kind: 'live_class_purchase',
+            title: 'Live class enrollment confirmed',
+            message:
+              item.scheduled_at
+                ? `You are enrolled in "${item.title}" on ${new Date(item.scheduled_at).toLocaleString('en-US')}.`
+                : `You are enrolled in "${item.title}".`,
+            relatedItemId: item.id,
+            relatedOrderId: order.id,
+            metadata: {
+              slug: item.slug,
+              scheduledAt: item.scheduled_at,
+              liveClassStatus: getLiveClassStatus(item.metadata),
+              registeredEmail: user.email,
+            },
+          });
         }
       }
 

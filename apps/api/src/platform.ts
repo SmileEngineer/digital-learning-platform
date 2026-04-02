@@ -17,11 +17,13 @@ export type CatalogItemRow = {
   image_url: string;
   price: string | number;
   currency: string;
+  status: string;
   featured: boolean;
   instructor_name: string | null;
   author_name: string | null;
   category: string | null;
   duration_label: string | null;
+  duration_minutes: number | null;
   students_count: number;
   rating: string | number | null;
   pages: number | null;
@@ -31,6 +33,8 @@ export type CatalogItemRow = {
   preview_count: number;
   stock_quantity: number | null;
   scheduled_at: string | null;
+  meeting_url: string | null;
+  spots_total: number | null;
   spots_remaining: number | null;
   question_count: number | null;
   time_limit_minutes: number | null;
@@ -40,6 +44,8 @@ export type CatalogItemRow = {
   tags: string[] | null;
   curriculum: Array<{ title?: string; lectures?: number; duration?: string }> | null;
   metadata: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type CatalogCardDto = {
@@ -73,6 +79,11 @@ export type CatalogCardDto = {
   passingScore?: number;
   author?: string;
   stock?: number;
+  liveClassStatus?: string;
+  cancellationReason?: string;
+  registeredEmailRequired?: boolean;
+  meetingProvider?: string;
+  joinWindowMinutes?: number;
   validityLabel?: string;
   curriculum: Array<{ title?: string; lectures?: number; duration?: string }>;
 };
@@ -102,6 +113,7 @@ export function formatValidityLabel(days: number | null): string {
 
 export function mapCatalogItem(row: CatalogItemRow): CatalogCardDto {
   const { date, time } = formatDateParts(row.scheduled_at);
+  const metadata = row.metadata ?? {};
   return {
     id: row.slug,
     productId: row.id,
@@ -135,8 +147,16 @@ export function mapCatalogItem(row: CatalogItemRow): CatalogCardDto {
     passingScore: row.passing_score ?? undefined,
     author:
       row.author_name ??
-      (row.metadata && typeof row.metadata.author === 'string' ? row.metadata.author : undefined),
+      (metadata && typeof metadata.author === 'string' ? metadata.author : undefined),
     stock: row.stock_quantity ?? undefined,
+    liveClassStatus: typeof metadata.liveClassStatus === 'string' ? metadata.liveClassStatus : undefined,
+    cancellationReason:
+      typeof metadata.cancellationReason === 'string' ? metadata.cancellationReason : undefined,
+    registeredEmailRequired:
+      typeof metadata.registeredEmailRequired === 'boolean' ? metadata.registeredEmailRequired : undefined,
+    meetingProvider: typeof metadata.meetingProvider === 'string' ? metadata.meetingProvider : undefined,
+    joinWindowMinutes:
+      typeof metadata.joinWindowMinutes === 'number' ? metadata.joinWindowMinutes : undefined,
     validityLabel: formatValidityLabel(row.validity_days),
     curriculum: row.curriculum ?? [],
   };

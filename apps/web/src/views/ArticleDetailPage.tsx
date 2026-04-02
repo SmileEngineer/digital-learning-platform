@@ -5,18 +5,18 @@ import { useParams } from 'next/navigation';
 import { Badge } from '../components/Badge';
 import { Card } from '../components/Card';
 import { Calendar, Clock, User } from 'lucide-react';
-import { fetchCatalogItem, type CatalogItem } from '@/lib/platform-api';
+import { fetchArticleDetail, type AdminArticle } from '@/lib/platform-api';
 
 export function ArticleDetailPage() {
   const params = useParams<{ id: string }>();
   const slug = Array.isArray(params?.id) ? params.id[0] : params?.id;
-  const [article, setArticle] = useState<CatalogItem | null>(null);
+  const [article, setArticle] = useState<AdminArticle | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) return;
     let cancelled = false;
-    fetchCatalogItem(slug)
+    fetchArticleDetail(slug)
       .then((item) => {
         if (!cancelled) {
           setArticle(item);
@@ -60,7 +60,15 @@ export function ArticleDetailPage() {
             </div>
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4" />
-              <span>Published article</span>
+              <span>
+                {article.publishedAt
+                  ? new Date(article.publishedAt).toLocaleDateString('en-US', {
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })
+                  : 'Published article'}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4" />
@@ -75,16 +83,25 @@ export function ArticleDetailPage() {
 
         <div className="prose prose-slate max-w-none">
           <p className="text-lg text-slate-700 mb-6">{article.description}</p>
-          <h2 className="text-2xl mb-4 mt-8">Overview</h2>
-          <p className="text-slate-700 mb-6">
-            Articles are published as read-only educational posts. This item is now loaded from the shared
-            platform catalog so the instructor can manage it alongside other content types.
-          </p>
-          <h2 className="text-2xl mb-4 mt-8">Why it matters</h2>
-          <p className="text-slate-700 mb-6">
-            The same content pipeline now powers courses, ebooks, live classes, exams, books, and articles,
-            which keeps the public site and admin workflows aligned.
-          </p>
+          {article.content.split('\n\n').map((paragraph, index) => (
+            <p key={index} className="text-slate-700 mb-6 whitespace-pre-line">
+              {paragraph}
+            </p>
+          ))}
+          {article.videoLinks.length > 0 && (
+            <>
+              <h2 className="text-2xl mb-4 mt-8">Related Videos</h2>
+              <ul>
+                {article.videoLinks.map((link) => (
+                  <li key={link}>
+                    <a href={link} target="_blank" rel="noreferrer">
+                      {link}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
       </div>
     </div>

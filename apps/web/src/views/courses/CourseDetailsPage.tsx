@@ -6,9 +6,9 @@ import {
   Award,
   CheckCircle,
   Clock,
-  Download,
   Globe,
   PlayCircle,
+  Shield,
   Signal,
   Star,
   Users,
@@ -31,6 +31,10 @@ function accessLabel(course: CourseDetail): string {
   return 'Lifetime access';
 }
 
+function isEmbedUrl(url: string): boolean {
+  return /youtube|youtu\.be|vimeo|loom|embed/i.test(url);
+}
+
 export function CourseDetailsPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -41,6 +45,7 @@ export function CourseDetailsPage() {
   const [relatedCourses, setRelatedCourses] = useState<CourseSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedLectureId, setSelectedLectureId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -76,6 +81,19 @@ export function CourseDetailsPage() {
     () => course?.sections.reduce((sum, section) => sum + section.lectures.length, 0) ?? 0,
     [course]
   );
+
+  const selectedLecture = useMemo(() => {
+    if (!course) return null;
+    const lectures = course.sections.flatMap((section) => section.lectures);
+    if (lectures.length === 0) return null;
+    return lectures.find((lecture) => lecture.id === selectedLectureId) ?? lectures[0];
+  }, [course, selectedLectureId]);
+
+  useEffect(() => {
+    if (!course) return;
+    const lectures = course.sections.flatMap((section) => section.lectures);
+    setSelectedLectureId(lectures[0]?.id ?? null);
+  }, [course]);
 
   function handleCheckoutRedirect() {
     if (!course) return;
@@ -152,6 +170,70 @@ export function CourseDetailsPage() {
             </div>
 
             <Card className="mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-2xl">Course Player</h2>
+                  <p className="text-slate-600 mt-1">
+                    {course.hasAccess
+                      ? 'Your purchased lectures are unlocked below.'
+                      : 'Preview lectures can be watched before purchase.'}
+                  </p>
+                </div>
+                {course.accessExpiresAt && (
+                  <Badge variant="warning">
+                    Access until {new Date(course.accessExpiresAt).toLocaleDateString()}
+                  </Badge>
+                )}
+              </div>
+
+              {selectedLecture?.videoUrl ? (
+                <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-950">
+                  {isEmbedUrl(selectedLecture.videoUrl) ? (
+                    <iframe
+                      src={selectedLecture.videoUrl}
+                      title={selectedLecture.title}
+                      className="h-96 w-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <video
+                      src={selectedLecture.videoUrl}
+                      controls
+                      controlsList="nodownload"
+                      className="h-96 w-full"
+                      onContextMenu={(event) => event.preventDefault()}
+                    />
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-slate-300 px-6 py-12 text-center text-slate-500">
+                  {course.hasAccess
+                    ? 'The selected lecture does not have a video URL yet.'
+                    : 'Preview lectures are listed below. Purchase the course to unlock the full video library.'}
+                </div>
+              )}
+
+              {selectedLecture && (
+                <div className="mt-4 rounded-lg bg-slate-50 p-4">
+                  <div className="flex flex-wrap items-center gap-3 mb-2">
+                    <h3 className="text-lg">{selectedLecture.title}</h3>
+                    {selectedLecture.isPreview && <Badge variant="info">Preview</Badge>}
+                    {selectedLecture.quizQuestionCount > 0 && (
+                      <Badge variant="neutral">
+                        {selectedLecture.quizQuestionCount} quiz question{selectedLecture.quizQuestionCount === 1 ? '' : 's'}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-600">
+                    Duration: {selectedLecture.durationText}
+                    {selectedLecture.quizTitle ? ` • Quiz: ${selectedLecture.quizTitle}` : ''}
+                  </p>
+                </div>
+              )}
+            </Card>
+
+            <Card className="mb-8">
               <h2 className="text-2xl mb-4">What you&apos;ll learn</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {course.learningPoints.map((item) => (
@@ -189,14 +271,27 @@ export function CourseDetailsPage() {
                       </span>
                     </summary>
                     <div className="px-4 py-3 border-t border-slate-200">
+                      {(section.quizTitle || section.quizQuestionCount > 0) && (
+                        <div className="mb-3 rounded-lg bg-white px-3 py-2 text-sm text-slate-600">
+                          Section quiz:
+                          {' '}
+                          {section.quizTitle ?? 'Section Assessment'}
+                          {' '}
+                          ({section.quizQuestionCount} questions)
+                        </div>
+                      )}
                       {section.lectures.length === 0 ? (
                         <p className="text-sm text-slate-500">Locked until course access is unlocked.</p>
                       ) : (
                         <div className="space-y-2">
                           {section.lectures.map((lecture) => (
-                            <div
+                            <button
+                              type="button"
                               key={lecture.id}
-                              className="flex items-center justify-between text-sm py-2"
+                              className={`flex w-full items-center justify-between rounded-lg px-2 py-2 text-sm ${
+                                selectedLecture?.id === lecture.id ? 'bg-indigo-50' : 'hover:bg-white'
+                              }`}
+                              onClick={() => setSelectedLectureId(lecture.id)}
                             >
                               <div className="flex items-center gap-3">
                                 <PlayCircle className="w-4 h-4 text-slate-400" />
@@ -206,9 +301,14 @@ export function CourseDetailsPage() {
                                     Preview
                                   </Badge>
                                 )}
+                                {lecture.quizQuestionCount > 0 && (
+                                  <Badge variant="neutral" size="sm">
+                                    Quiz
+                                  </Badge>
+                                )}
                               </div>
                               <span className="text-slate-600">{lecture.durationText}</span>
-                            </div>
+                            </button>
                           ))}
                         </div>
                       )}
@@ -293,8 +393,8 @@ export function CourseDetailsPage() {
                     <span>{course.durationText} of guided learning</span>
                   </div>
                   <div className="flex items-center gap-3 text-sm">
-                    <Download className="w-5 h-5 text-slate-400" />
-                    <span>Preview-first access control</span>
+                    <Shield className="w-5 h-5 text-slate-400" />
+                    <span>Preview-first access control with video URLs hidden for locked lectures</span>
                   </div>
                   <div className="flex items-center gap-3 text-sm">
                     <Award className="w-5 h-5 text-slate-400" />

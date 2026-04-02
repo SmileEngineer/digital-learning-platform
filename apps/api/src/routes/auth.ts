@@ -44,7 +44,7 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
       const inserted = await sql`
         INSERT INTO users (email, password_hash, name, role)
         VALUES (${emailRaw}, ${passwordHash}, ${name}, 'student')
-        RETURNING id, email, name, role, created_at
+        RETURNING id, email, name, role, admin_permissions, created_at
       `;
 
       const row = inserted[0] as {
@@ -52,12 +52,19 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
         email: string;
         name: string;
         role: 'student' | 'admin' | 'staff' | 'super_admin';
+        admin_permissions: string[];
       };
       const token = signUserToken(row.id, row.email, row.name, row.role);
 
       res.status(201).json({
         token,
-        user: { id: row.id, email: row.email, name: row.name, role: row.role },
+        user: {
+          id: row.id,
+          email: row.email,
+          name: row.name,
+          role: row.role,
+          adminPermissions: row.admin_permissions ?? [],
+        },
       });
     } catch (e) {
       console.error('register', e);
@@ -77,7 +84,7 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
       }
 
       const rows = await sql`
-        SELECT id, email, name, role, password_hash FROM users WHERE email = ${emailRaw} LIMIT 1
+        SELECT id, email, name, role, admin_permissions, password_hash FROM users WHERE email = ${emailRaw} LIMIT 1
       `;
       if (rows.length === 0) {
         res.status(401).json({ error: 'Invalid email or password.' });
@@ -89,6 +96,7 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
         email: string;
         name: string;
         role: 'student' | 'admin' | 'staff' | 'super_admin';
+        admin_permissions: string[];
         password_hash: string;
       };
       const ok = await verifyPassword(password, user.password_hash);
@@ -100,7 +108,13 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
       const token = signUserToken(user.id, user.email, user.name, user.role);
       res.json({
         token,
-        user: { id: user.id, email: user.email, name: user.name, role: user.role },
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          adminPermissions: user.admin_permissions ?? [],
+        },
       });
     } catch (e) {
       console.error('login', e);
@@ -122,7 +136,7 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
       }
 
       const rows = await sql`
-        SELECT id, email, name, role, created_at FROM users WHERE id = ${payload.sub} LIMIT 1
+        SELECT id, email, name, role, admin_permissions, created_at FROM users WHERE id = ${payload.sub} LIMIT 1
       `;
       if (rows.length === 0) {
         res.status(401).json({ error: 'Account not found.' });
@@ -134,10 +148,17 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
         email: string;
         name: string;
         role: 'student' | 'admin' | 'staff' | 'super_admin';
+        admin_permissions: string[];
         created_at: string;
       };
       res.json({
-        user: { id: u.id, email: u.email, name: u.name, role: u.role },
+        user: {
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          role: u.role,
+          adminPermissions: u.admin_permissions ?? [],
+        },
       });
     } catch (e) {
       console.error('me', e);

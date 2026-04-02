@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
-import { CheckCircle, Truck } from 'lucide-react';
+import { CheckCircle, ExternalLink, Truck } from 'lucide-react';
 import { fetchLearnerOrders, type LearnerOrder } from '@/lib/platform-api';
 
 export function MyOrdersPage() {
@@ -55,12 +55,29 @@ export function MyOrdersPage() {
                 <div className="text-sm text-slate-600 mb-1">{order.itemTitle}</div>
                 <div className="text-lg">${order.totalAmount.toFixed(2)}</div>
                 {order.consignmentNumber && (
-                  <div className="text-xs text-slate-500 mt-1">Tracking: {order.consignmentNumber}</div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    Tracking: {order.consignmentNumber} {order.carrier ? `(${order.carrier})` : ''}
+                  </div>
+                )}
+                {order.pinCode && (
+                  <div className="text-xs text-slate-500 mt-1">
+                    Delivery PIN: {order.pinCode}
+                    {order.city ? ` • ${order.city}` : ''}
+                  </div>
                 )}
               </div>
-              <Button size="sm" variant="outline">
-                View Details
-              </Button>
+              {order.trackingUrl ? (
+                <a href={order.trackingUrl} target="_blank" rel="noreferrer">
+                  <Button size="sm" variant="outline">
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Track Order
+                  </Button>
+                </a>
+              ) : (
+                <Button size="sm" variant="outline" disabled>
+                  View Details
+                </Button>
+              )}
             </div>
           </Card>
         ))}

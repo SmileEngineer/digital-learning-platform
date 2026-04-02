@@ -3,6 +3,7 @@ export type AuthUser = {
   email: string;
   name: string;
   role: 'student' | 'admin' | 'staff' | 'super_admin';
+  adminPermissions?: string[];
 };
 
 export async function readAuthError(res: Response): Promise<string> {

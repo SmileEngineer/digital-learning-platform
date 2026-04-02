@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import { requireSessionUser } from '../auth/session.js';
+import { buildDtdcTrackingUrl } from '../shipping.js';
 
 type CountRow = {
   courses: number;
@@ -28,6 +29,13 @@ type ShipmentRow = {
   total_amount: string | number;
   shipment_status: string | null;
   consignment_number: string | null;
+  carrier: string | null;
+  tracking_url: string | null;
+  address_line: string | null;
+  city: string | null;
+  state: string | null;
+  pin_code: string | null;
+  delivered_at: string | null;
   created_at: string;
 };
 
@@ -281,6 +289,13 @@ export function createLearnerRouter(sql: NeonQueryFunction<false, false>): Route
           o.total_amount,
           COALESCE(bs.shipment_status, o.status) AS shipment_status,
           bs.consignment_number,
+          bs.carrier,
+          bs.tracking_url,
+          bs.address_line,
+          bs.city,
+          bs.state,
+          bs.pin_code,
+          bs.delivered_at,
           o.created_at
         FROM orders o
         JOIN order_items oi ON oi.order_id = o.id
@@ -298,6 +313,13 @@ export function createLearnerRouter(sql: NeonQueryFunction<false, false>): Route
           totalAmount: typeof row.total_amount === 'number' ? row.total_amount : Number(row.total_amount),
           status: row.shipment_status ?? 'paid',
           consignmentNumber: row.consignment_number,
+          carrier: row.carrier,
+          trackingUrl: row.tracking_url ?? (row.consignment_number ? buildDtdcTrackingUrl(row.consignment_number) : null),
+          addressLine: row.address_line,
+          city: row.city,
+          state: row.state,
+          pinCode: row.pin_code,
+          deliveredAt: row.delivered_at,
           createdAt: row.created_at,
         })),
       });

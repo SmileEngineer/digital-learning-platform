@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
@@ -8,6 +9,7 @@ import { ClipboardList } from 'lucide-react';
 import { fetchLearnerLibrary, type LearnerLibraryItem } from '@/lib/platform-api';
 
 export function MyPracticeExamsPage() {
+  const router = useRouter();
   const [exams, setExams] = useState<LearnerLibraryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,7 +53,12 @@ export function MyPracticeExamsPage() {
                 <Badge variant={exam.remainingAttempts && exam.remainingAttempts > 0 ? 'info' : 'success'}>
                   {exam.remainingAttempts && exam.remainingAttempts > 0 ? 'Available' : 'Used'}
                 </Badge>
-                <Button size="sm">{exam.remainingAttempts && exam.remainingAttempts > 0 ? 'Start Exam' : 'Review'}</Button>
+                <Button
+                  size="sm"
+                  onClick={() => router.push(`/practice-exams/${exam.slug}`)}
+                >
+                  {exam.remainingAttempts && exam.remainingAttempts > 0 ? 'Start Exam' : 'Review'}
+                </Button>
               </div>
             </div>
           </Card>

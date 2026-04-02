@@ -1,13 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Download, Eye, FileText, Shield, Star } from 'lucide-react';
+import { AlertTriangle, Download, Eye, FileText, Shield, Smartphone, Star } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { Card } from '../components/Card';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchCatalogItem, fetchLearnerAccess, type CatalogItem } from '@/lib/platform-api';
+import {
+  fetchEbookPreview,
+  fetchPurchasedEbookReader,
+  requestEbookDownload,
+  type CatalogItem,
+  type EbookReaderData,
+} from '@/lib/platform-api';
+import { buildQrCodeDataUrl, createWatermarkedEbookHtml, triggerHtmlDownload } from '@/lib/ebook-reader';
 
 export function EbookDetailPage() {
   const params = useParams<{ id: string }>();
@@ -15,25 +22,34 @@ export function EbookDetailPage() {
   const { user } = useAuth();
   const slug = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
-  const [item, setItem] = useState<CatalogItem | null>(null);
-  const [hasAccess, setHasAccess] = useState(false);
+  const [reader, setReader] = useState<EbookReaderData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) return;
     let cancelled = false;
+
     async function load() {
       try {
         setLoading(true);
-        const ebook = await fetchCatalogItem(slug);
-        let access = false;
+        const preview = await fetchEbookPreview(slug);
+        let nextReader = preview;
+
         if (user) {
-          access = (await fetchLearnerAccess(slug)).hasAccess;
+          try {
+            nextReader = await fetchPurchasedEbookReader(slug);
+          } catch (purchaseErr) {
+            if (!(purchaseErr instanceof Error) || !/purchase this ebook/i.test(purchaseErr.message)) {
+              throw purchaseErr;
+            }
+          }
         }
+
         if (!cancelled) {
-          setItem(ebook);
-          setHasAccess(access);
+          setReader(nextReader);
           setError(null);
         }
       } catch (err) {
@@ -50,11 +66,83 @@ export function EbookDetailPage() {
     };
   }, [slug, user]);
 
+  useEffect(() => {
+    let cancelled = false;
+    buildQrCodeDataUrl(reader?.qrValue ?? null)
+      .then((value) => {
+        if (!cancelled) setQrCodeDataUrl(value);
+      })
+      .catch(() => {
+        if (!cancelled) setQrCodeDataUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reader?.qrValue]);
+
+  useEffect(() => {
+    if (!reader?.protection.disableRightClick) return;
+
+    const blockContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+    };
+
+    const blockShortcuts = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      const ctrlLike = event.ctrlKey || event.metaKey;
+      if (
+        key === 'f12' ||
+        (ctrlLike && event.shiftKey && ['i', 'j', 'c'].includes(key)) ||
+        (ctrlLike && ['u', 's', 'p'].includes(key))
+      ) {
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener('contextmenu', blockContextMenu);
+    window.addEventListener('keydown', blockShortcuts);
+    return () => {
+      window.removeEventListener('contextmenu', blockContextMenu);
+      window.removeEventListener('keydown', blockShortcuts);
+    };
+  }, [reader?.protection.disableRightClick]);
+
+  const item = reader?.item ?? null;
+  const hasAccess = reader?.hasAccess ?? false;
+  const previewCount = useMemo(
+    () => Math.max(1, reader?.item.previewCount ?? reader?.pages.length ?? 1),
+    [reader]
+  );
+
+  async function handleDownload() {
+    if (!item) return;
+    try {
+      setDownloading(true);
+      const payload = await requestEbookDownload(item.slug);
+      const message =
+        payload.downloadConfirmationMessage ??
+        'This eBook will be exported with your watermark on every page. Continue?';
+      if (!window.confirm(message)) return;
+      const qr = await buildQrCodeDataUrl(payload.qrValue);
+      const html = createWatermarkedEbookHtml({
+        title: payload.item.title,
+        pages: payload.pages,
+        watermarkText: payload.watermarkText,
+        qrCodeDataUrl: qr,
+      });
+      triggerHtmlDownload(payload.filename, html);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not download ebook.');
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   if (loading) {
     return <div className="container mx-auto px-4 py-12 text-slate-600">Loading ebook…</div>;
   }
 
-  if (!item || error) {
+  if (!reader || !item || error) {
     return (
       <div className="container mx-auto px-4 py-12">
         <Card className="text-center py-12">
@@ -65,7 +153,7 @@ export function EbookDetailPage() {
     );
   }
 
-  const previewPages = Array.from({ length: Math.max(1, item.previewCount ?? 1) }, (_, i) => i + 1);
+  const activeReader = reader;
 
   return (
     <div className="py-8">
@@ -115,8 +203,8 @@ export function EbookDetailPage() {
             <Card className="mb-8">
               <h2 className="text-2xl mb-4">What&apos;s Inside</h2>
               <div className="space-y-3">
-                {(item.curriculum.length > 0
-                  ? item.curriculum.map((entry) => entry.title || `${entry.lectures ?? 0} chapters`)
+                {(activeReader.pages.length > 0
+                  ? activeReader.pages.map((entry) => entry.title)
                   : ['Preview pages', 'Secure reader access', 'Watermarked entitlement-based access']
                 ).map((line, index) => (
                   <div key={`${line}-${index}`} className="flex gap-3">
@@ -134,32 +222,60 @@ export function EbookDetailPage() {
               <div className="prose prose-slate max-w-none text-slate-700">
                 <p>{item.description}</p>
                 <p>
-                  Purchased readers receive protected access. The current implementation uses entitlement
-                  checks from your account before showing the full content experience.
+                  Purchased readers receive full-page access with watermark protection, preview gating,
+                  and account-linked access checks before content is unlocked.
                 </p>
               </div>
             </Card>
 
             <Card className="mb-8">
-              <h2 className="text-2xl mb-4">Preview Pages</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {previewPages.map((page) => (
+              <div className="flex items-center justify-between mb-4 gap-3">
+                <h2 className="text-2xl">{hasAccess ? 'Watermarked Reader' : 'Preview Pages'}</h2>
+                <Badge variant={hasAccess ? 'success' : 'warning'}>
+                  {hasAccess ? 'Purchased access' : `${previewCount} preview page${previewCount === 1 ? '' : 's'}`}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 select-none">
+                {activeReader.pages.map((page) => (
                   <div
-                    key={page}
-                    className="aspect-[3/4] rounded border border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100 p-3 relative overflow-hidden"
+                    key={page.pageNumber}
+                    className="relative min-h-[30rem] rounded border border-slate-200 bg-white p-5 overflow-hidden shadow-sm"
                   >
-                    <div className="absolute inset-0 flex items-center justify-center opacity-10 rotate-[-24deg] text-3xl font-black text-slate-500">
-                      {user?.email ?? 'Preview'}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-[0.08] rotate-[-28deg] text-3xl font-black text-slate-500 pointer-events-none">
+                      {activeReader.watermarkText}
                     </div>
-                    <div className="flex h-full flex-col items-center justify-center text-slate-500">
-                      <Eye className="w-8 h-8 mb-2" />
-                      <span className="text-sm">Page {page}</span>
+                    {qrCodeDataUrl && (
+                      <img
+                        src={qrCodeDataUrl}
+                        alt="Reader QR watermark"
+                        className="absolute bottom-4 right-4 w-20 h-20 opacity-90"
+                      />
+                    )}
+                    <div className="relative z-10 flex h-full flex-col">
+                      <div className="text-xs uppercase tracking-wide text-indigo-600 mb-3">
+                        Page {page.pageNumber}
+                      </div>
+                      <h3 className="text-xl mb-3">{page.title}</h3>
+                      {page.imageUrl && (
+                        <img
+                          src={page.imageUrl}
+                          alt={page.title}
+                          className="w-full h-44 object-cover rounded-lg border border-slate-200 mb-4"
+                        />
+                      )}
+                      <p className="text-slate-700 whitespace-pre-line leading-7">{page.body}</p>
                     </div>
                   </div>
                 ))}
               </div>
+
               {!hasAccess && (
-                <Button variant="outline" className="w-full mt-4" onClick={() => router.push(`/checkout?product=${item.slug}`)}>
+                <Button
+                  variant="outline"
+                  className="w-full mt-4"
+                  onClick={() => router.push(`/checkout?product=${item.slug}`)}
+                >
                   <Eye className="w-4 h-4 mr-2" />
                   Unlock Full eBook
                 </Button>
@@ -168,26 +284,20 @@ export function EbookDetailPage() {
 
             {hasAccess && (
               <Card className="mb-8">
-                <h2 className="text-2xl mb-4">Reader Access</h2>
+                <h2 className="text-2xl mb-4">Reader Security</h2>
                 <div className="grid gap-4 md:grid-cols-2">
-                  {Array.from({ length: 4 }).map((_, index) => (
-                    <div
-                      key={index}
-                      className="aspect-[3/4] rounded border border-slate-200 bg-white p-4 relative overflow-hidden shadow-sm"
-                    >
-                      <div className="absolute inset-0 flex items-center justify-center opacity-[0.08] rotate-[-24deg] text-3xl font-black text-slate-500">
-                        {user?.email ?? 'LearnHub'}
-                      </div>
-                      <div className="relative z-10 flex h-full flex-col justify-between">
-                        <div className="text-xs uppercase tracking-wide text-indigo-600">Watermarked</div>
-                        <p className="text-sm text-slate-700">
-                          Secure page preview for {item.title}. Download rights are{' '}
-                          {item.downloadAllowed ? 'enabled' : 'disabled'} for this item.
-                        </p>
-                        <div className="text-xs text-slate-500">Page sample {index + 1}</div>
-                      </div>
-                    </div>
-                  ))}
+                  <div className="rounded-lg border border-slate-200 p-4">
+                    <div className="text-xs uppercase tracking-wide text-indigo-600 mb-2">Watermarking</div>
+                    <p className="text-sm text-slate-700">
+                      Each page shows a diagonal contact watermark and QR watermark tied to the purchased account.
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 p-4">
+                    <div className="text-xs uppercase tracking-wide text-indigo-600 mb-2">Read-only web access</div>
+                    <p className="text-sm text-slate-700">
+                      Right-click and common inspect/save shortcuts are blocked while the protected reader is open.
+                    </p>
+                  </div>
                 </div>
               </Card>
             )}
@@ -198,9 +308,27 @@ export function EbookDetailPage() {
                 <div>
                   <h3 className="mb-2 text-blue-900">Digital Rights & Security</h3>
                   <p className="text-sm text-blue-800">
-                    Downloads and reading access are tied to your account entitlement. Watermark and
-                    protected-reader flows can be extended further from this foundation.
+                    Reader access is tied to your account entitlement. Protected view mode blocks common
+                    copy/inspect shortcuts, and exported copies keep the same watermark identity.
                   </p>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2 text-xs text-blue-900">
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-4 h-4" />
+                      Entitlement-based reader unlock
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Smartphone className="w-4 h-4" />
+                      Single-device notice shown in admin policy
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      Screenshot blocking depends on browser/device limitations
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Eye className="w-4 h-4" />
+                      Preview pages visible before purchase
+                    </div>
+                  </div>
                 </div>
               </div>
             </Card>
@@ -227,10 +355,11 @@ export function EbookDetailPage() {
                       variant="outline"
                       size="lg"
                       className="mb-6"
-                      disabled={!item.downloadAllowed}
+                      onClick={handleDownload}
+                      disabled={!item.downloadAllowed || downloading}
                     >
                       <Download className="w-4 h-4 mr-2" />
-                      {item.downloadAllowed ? 'Download Copy' : 'Download Disabled'}
+                      {item.downloadAllowed ? (downloading ? 'Preparing Download…' : 'Download Copy') : 'Download Disabled'}
                     </Button>
                   </>
                 ) : (
@@ -269,7 +398,7 @@ export function EbookDetailPage() {
                   </div>
                   <div className="flex items-center gap-3 text-sm">
                     <Shield className="w-5 h-5 text-slate-400" />
-                    <span>Protected entitlement-based access</span>
+                    <span>{hasAccess ? 'Full watermarked reader unlocked' : 'Protected preview until purchase'}</span>
                   </div>
                 </div>
               </Card>

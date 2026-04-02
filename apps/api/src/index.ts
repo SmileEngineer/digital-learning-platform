@@ -3,10 +3,15 @@ import cors from 'cors';
 import express from 'express';
 import { neon } from '@neondatabase/serverless';
 import { createAuthRouter } from './routes/auth.js';
+import { createAdminToolsRouter, createCatalogArticlesRouter } from './routes/admin-tools.js';
+import { createAdminBooksRouter, createCatalogBooksRouter } from './routes/books.js';
 import { createAdminCoursesRouter, createCoursesRouter, createMeRouter } from './routes/courses.js';
 import { createCatalogRouter } from './routes/catalog.js';
 import { createCheckoutRouter } from './routes/checkout.js';
+import { createAdminEbooksRouter, createCatalogEbooksRouter, createLearnerEbooksRouter } from './routes/ebooks.js';
 import { createLearnerRouter } from './routes/learner.js';
+import { createAdminLiveClassesRouter, createLearnerLiveClassesRouter } from './routes/live-classes.js';
+import { createAdminPracticeExamsRouter, createLearnerPracticeExamsRouter } from './routes/practice-exams.js';
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
@@ -43,9 +48,20 @@ if (dbUrl) {
   app.use('/courses', createCoursesRouter(sql));
   app.use('/me', createMeRouter(sql));
   app.use('/admin', createAdminCoursesRouter(sql));
+  app.use('/admin', createAdminToolsRouter(sql));
+  app.use('/admin', createAdminBooksRouter(sql));
+  app.use('/admin', createAdminEbooksRouter(sql));
+  app.use('/admin', createAdminLiveClassesRouter(sql));
+  app.use('/admin', createAdminPracticeExamsRouter(sql));
   app.use('/catalog', createCatalogRouter(sql));
+  app.use('/catalog', createCatalogArticlesRouter(sql));
+  app.use('/catalog', createCatalogBooksRouter(sql));
+  app.use('/catalog', createCatalogEbooksRouter(sql));
   app.use('/checkout', createCheckoutRouter(sql));
   app.use('/learner', createLearnerRouter(sql));
+  app.use('/learner', createLearnerEbooksRouter(sql));
+  app.use('/learner', createLearnerLiveClassesRouter(sql));
+  app.use('/learner', createLearnerPracticeExamsRouter(sql));
 } else {
   console.warn('[api] DATABASE_URL is not set — auth routes return 503');
   const notReady = (_req: express.Request, res: express.Response) => {
