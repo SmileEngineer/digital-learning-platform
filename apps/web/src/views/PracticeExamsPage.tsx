@@ -1,51 +1,42 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
 import { PracticeExamCard } from '../components/PracticeExamCard';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { Button } from '../components/Button';
-
-const exams = [
-  {
-    id: '1',
-    title: 'AWS Certified Solutions Architect Practice Exam',
-    description: 'Comprehensive practice test covering all exam topics with detailed explanations.',
-    price: 39.99,
-    questions: 65,
-    timeLimit: '130 minutes',
-    attempts: 3,
-    passingScore: 72,
-  },
-  {
-    id: '2',
-    title: 'React Developer Certification Mock Test',
-    description: 'Test your React knowledge with real-world scenarios and best practices.',
-    price: 29.99,
-    questions: 50,
-    timeLimit: '90 minutes',
-    attempts: 2,
-    passingScore: 70,
-  },
-  {
-    id: '3',
-    title: 'Python Professional Certification Exam',
-    description: 'Advanced Python concepts, algorithms, and data structures assessment.',
-    price: 34.99,
-    questions: 75,
-    timeLimit: '120 minutes',
-    attempts: 3,
-    passingScore: 75,
-  },
-  {
-    id: '4',
-    title: 'Digital Marketing Expert Practice Test',
-    description: 'Comprehensive exam covering SEO, SEM, social media, and analytics.',
-    price: 24.99,
-    questions: 60,
-    timeLimit: '100 minutes',
-    attempts: 2,
-    passingScore: 70,
-  },
-];
+import { fetchCatalogItems, type CatalogItem } from '@/lib/platform-api';
 
 export function PracticeExamsPage() {
+  const [exams, setExams] = useState<CatalogItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCatalogItems('practice_exam')
+      .then((items) => {
+        if (!cancelled) setExams(items);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load practice exams');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return exams;
+    return exams.filter((exam) =>
+      [exam.title, exam.description, exam.instructor].some((value) => value.toLowerCase().includes(q))
+    );
+  }, [exams, searchQuery]);
+
   return (
     <div className="py-8">
       <div className="container mx-auto px-4">
@@ -62,23 +53,27 @@ export function PracticeExamsPage() {
                 <input
                   type="text"
                   placeholder="Search exams..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-indigo-500"
                 />
               </div>
             </div>
             <Button variant="outline">
               <SlidersHorizontal className="w-4 h-4 mr-2" />
-              Filters
+              Backend filters coming next
             </Button>
           </div>
         </div>
         
         <div className="mb-6">
-          <p className="text-slate-600">{exams.length} exams available</p>
+          <p className="text-slate-600">{loading ? 'Loading exams...' : `${filtered.length} exams available`}</p>
         </div>
+
+        {error && <p className="mb-6 text-sm text-red-600">{error}</p>}
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {exams.map((exam) => (
+          {filtered.map((exam) => (
             <PracticeExamCard key={exam.id} {...exam} />
           ))}
         </div>

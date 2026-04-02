@@ -1,14 +1,9 @@
 import { Router } from 'express';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import { hashPassword, signUserToken, verifyPassword, verifyUserToken } from '../auth/crypto.js';
+import { parseBearer } from '../auth/request-user.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function parseBearer(req: { headers: { authorization?: string } }): string | null {
-  const h = req.headers.authorization;
-  if (!h || !h.startsWith('Bearer ')) return null;
-  return h.slice(7).trim() || null;
-}
 
 export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
   const router = Router();
@@ -47,17 +42,22 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
 
       const passwordHash = await hashPassword(password);
       const inserted = await sql`
-        INSERT INTO users (email, password_hash, name)
-        VALUES (${emailRaw}, ${passwordHash}, ${name})
-        RETURNING id, email, name, created_at
+        INSERT INTO users (email, password_hash, name, role)
+        VALUES (${emailRaw}, ${passwordHash}, ${name}, 'student')
+        RETURNING id, email, name, role, created_at
       `;
 
-      const row = inserted[0] as { id: string; email: string; name: string };
-      const token = signUserToken(row.id, row.email, row.name);
+      const row = inserted[0] as {
+        id: string;
+        email: string;
+        name: string;
+        role: 'student' | 'admin' | 'staff' | 'super_admin';
+      };
+      const token = signUserToken(row.id, row.email, row.name, row.role);
 
       res.status(201).json({
         token,
-        user: { id: row.id, email: row.email, name: row.name },
+        user: { id: row.id, email: row.email, name: row.name, role: row.role },
       });
     } catch (e) {
       console.error('register', e);
@@ -77,24 +77,30 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
       }
 
       const rows = await sql`
-        SELECT id, email, name, password_hash FROM users WHERE email = ${emailRaw} LIMIT 1
+        SELECT id, email, name, role, password_hash FROM users WHERE email = ${emailRaw} LIMIT 1
       `;
       if (rows.length === 0) {
         res.status(401).json({ error: 'Invalid email or password.' });
         return;
       }
 
-      const user = rows[0] as { id: string; email: string; name: string; password_hash: string };
+      const user = rows[0] as {
+        id: string;
+        email: string;
+        name: string;
+        role: 'student' | 'admin' | 'staff' | 'super_admin';
+        password_hash: string;
+      };
       const ok = await verifyPassword(password, user.password_hash);
       if (!ok) {
         res.status(401).json({ error: 'Invalid email or password.' });
         return;
       }
 
-      const token = signUserToken(user.id, user.email, user.name);
+      const token = signUserToken(user.id, user.email, user.name, user.role);
       res.json({
         token,
-        user: { id: user.id, email: user.email, name: user.name },
+        user: { id: user.id, email: user.email, name: user.name, role: user.role },
       });
     } catch (e) {
       console.error('login', e);
@@ -116,16 +122,22 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
       }
 
       const rows = await sql`
-        SELECT id, email, name, created_at FROM users WHERE id = ${payload.sub} LIMIT 1
+        SELECT id, email, name, role, created_at FROM users WHERE id = ${payload.sub} LIMIT 1
       `;
       if (rows.length === 0) {
         res.status(401).json({ error: 'Account not found.' });
         return;
       }
 
-      const u = rows[0] as { id: string; email: string; name: string; created_at: string };
+      const u = rows[0] as {
+        id: string;
+        email: string;
+        name: string;
+        role: 'student' | 'admin' | 'staff' | 'super_admin';
+        created_at: string;
+      };
       res.json({
-        user: { id: u.id, email: u.email, name: u.name },
+        user: { id: u.id, email: u.email, name: u.name, role: u.role },
       });
     } catch (e) {
       console.error('me', e);

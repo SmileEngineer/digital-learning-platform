@@ -1,93 +1,58 @@
+'use client';
+
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { Button } from '../components/Button';
 import { CourseCard } from '../components/CourseCard';
 import { EbookCard } from '../components/EbookCard';
 import { LiveClassCard } from '../components/LiveClassCard';
 import { ArrowRight, BookOpen, Video, FileText, Award, Star } from 'lucide-react';
+import { fetchHomeHighlights, type HomeHighlights } from '@/lib/platform-api';
 
-const featuredCourses = [
-  {
-    id: '1',
-    title: 'Complete Web Development Bootcamp',
-    description: 'Master HTML, CSS, JavaScript, React, Node.js and more in this comprehensive course.',
-    image: 'https://images.unsplash.com/photo-1771408427146-09be9a1d4535?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxvbmxpbmUlMjBsZWFybmluZyUyMHN0dWRlbnQlMjBsYXB0b3B8ZW58MXx8fHwxNzc1MDQ0OTc4fDA&ixlib=rb-4.1.0&q=80&w=1080',
-    price: 89.99,
-    duration: '40 hours',
-    students: 15420,
-    rating: 4.8,
-    tags: ['Bestseller'],
-    instructor: 'Dr. Sarah Johnson',
-  },
-  {
-    id: '2',
-    title: 'Data Science & Machine Learning',
-    description: 'Learn Python, pandas, scikit-learn, and build real-world ML projects.',
-    image: 'https://images.unsplash.com/photo-1762330917056-e69b34329ddf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkaWdpdGFsJTIwY291cnNlJTIwdGVjaG5vbG9neXxlbnwxfHx8fDE3NzUwNTgzMTJ8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    price: 99.99,
-    duration: '35 hours',
-    students: 12300,
-    rating: 4.9,
-    tags: ['New'],
-    instructor: 'Prof. Michael Chen',
-  },
-  {
-    id: '3',
-    title: 'Digital Marketing Masterclass',
-    description: 'Complete guide to SEO, social media marketing, content marketing, and analytics.',
-    image: 'https://images.unsplash.com/photo-1621743018966-29194999d736?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB3b3Jrc3BhY2UlMjBkZXNrfGVufDF8fHx8MTc3NTA1Njk2MHww&ixlib=rb-4.1.0&q=80&w=1080',
-    price: 79.99,
-    duration: '28 hours',
-    students: 9800,
-    rating: 4.7,
-    tags: ['Bestseller'],
-    instructor: 'Emily Martinez',
-  },
-];
-
-const featuredEbooks = [
-  {
-    id: '1',
-    title: 'The Complete Guide to Modern JavaScript',
-    description: 'Master ES6+ features, async programming, and modern JavaScript patterns.',
-    coverImage: 'https://images.unsplash.com/photo-1772617532657-2d0e38868716?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxib29rJTIwZWR1Y2F0aW9uJTIwa25vd2xlZGdlfGVufDF8fHx8MTc3NTA1ODMxMXww&ixlib=rb-4.1.0&q=80&w=1080',
-    price: 29.99,
-    pages: 450,
-    format: 'PDF',
-    downloadAllowed: true,
-    previewAvailable: true,
-    tags: ['New Release'],
-  },
-  {
-    id: '2',
-    title: 'Python for Data Analysis',
-    description: 'Comprehensive guide to data manipulation and analysis using pandas and NumPy.',
-    coverImage: 'https://images.unsplash.com/photo-1724148227179-807a0ca73774?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxlYm9vayUyMHJlYWRlciUyMGRpZ2l0YWx8ZW58MXx8fHwxNzc1MDU4MzEzfDA&ixlib=rb-4.1.0&q=80&w=1080',
-    price: 34.99,
-    pages: 520,
-    format: 'PDF',
-    downloadAllowed: true,
-    previewAvailable: true,
-  },
-];
-
-const upcomingLiveClasses = [
-  {
-    id: '1',
-    title: 'Advanced React Patterns Workshop',
-    description: 'Learn advanced React patterns including compound components, render props, and hooks.',
-    image: 'https://images.unsplash.com/photo-1766074903112-79661da9ab45?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsaXZlJTIwY2xhc3MlMjB3ZWJpbmFyJTIwdGVhY2hpbmd8ZW58MXx8fHwxNzc1MDU4MzEzfDA&ixlib=rb-4.1.0&q=80&w=1080',
-    price: 49.99,
-    date: 'April 15, 2026',
-    time: '2:00 PM EST',
-    duration: '3 hours',
-    instructor: 'Alex Thompson',
-    spotsLeft: 8,
-  },
-];
+const emptyHighlights: HomeHighlights = {
+  featuredCourses: [],
+  featuredEbooks: [],
+  upcomingLiveClasses: [],
+  featuredExams: [],
+  featuredBooks: [],
+  featuredArticles: [],
+  stats: { courses: 0, students: 0, ebooks: 0, successRate: 95 },
+  scroller: { enabled: false, message: '' },
+};
 
 export function HomePage() {
+  const [data, setData] = useState<HomeHighlights>(emptyHighlights);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchHomeHighlights()
+      .then((result) => {
+        if (!cancelled) {
+          setData(result);
+          setError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load homepage');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div>
+      {data.scroller.enabled && data.scroller.message && (
+        <div className="bg-amber-100 border-b border-amber-200 text-amber-900">
+          <div className="container mx-auto px-4 py-3 text-sm">{data.scroller.message}</div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 text-white py-20">
         <div className="container mx-auto px-4">
@@ -117,19 +82,19 @@ export function HomePage() {
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div>
-              <div className="text-4xl text-indigo-600 mb-2">500+</div>
+              <div className="text-4xl text-indigo-600 mb-2">{loading ? '...' : `${data.stats.courses}+`}</div>
               <div className="text-slate-600">Courses</div>
             </div>
             <div>
-              <div className="text-4xl text-indigo-600 mb-2">50K+</div>
+              <div className="text-4xl text-indigo-600 mb-2">{loading ? '...' : `${data.stats.students}+`}</div>
               <div className="text-slate-600">Students</div>
             </div>
             <div>
-              <div className="text-4xl text-indigo-600 mb-2">200+</div>
+              <div className="text-4xl text-indigo-600 mb-2">{loading ? '...' : `${data.stats.ebooks}+`}</div>
               <div className="text-slate-600">eBooks</div>
             </div>
             <div>
-              <div className="text-4xl text-indigo-600 mb-2">95%</div>
+              <div className="text-4xl text-indigo-600 mb-2">{data.stats.successRate}%</div>
               <div className="text-slate-600">Success Rate</div>
             </div>
           </div>
@@ -151,8 +116,10 @@ export function HomePage() {
             </Link>
           </div>
           
+          {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {featuredCourses.map((course) => (
+            {data.featuredCourses.map((course) => (
               <CourseCard key={course.id} {...course} />
             ))}
           </div>
@@ -175,8 +142,20 @@ export function HomePage() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredEbooks.map((ebook) => (
-              <EbookCard key={ebook.id} {...ebook} />
+            {data.featuredEbooks.map((ebook) => (
+              <EbookCard
+                key={ebook.id}
+                id={String(ebook.id)}
+                title={ebook.title}
+                description={ebook.description}
+                coverImage={ebook.coverImage}
+                price={ebook.price}
+                pages={ebook.pages ?? 0}
+                format={ebook.format}
+                downloadAllowed={ebook.downloadAllowed}
+                previewAvailable={ebook.previewAvailable}
+                tags={ebook.tags}
+              />
             ))}
           </div>
         </div>
@@ -198,7 +177,7 @@ export function HomePage() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {upcomingLiveClasses.map((liveClass) => (
+            {data.upcomingLiveClasses.map((liveClass) => (
               <LiveClassCard key={liveClass.id} {...liveClass} />
             ))}
           </div>

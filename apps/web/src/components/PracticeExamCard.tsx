@@ -8,10 +8,10 @@ interface PracticeExamCardProps {
   title: string;
   description: string;
   price: number;
-  questions: number;
-  timeLimit: string;
-  attempts: number;
-  passingScore: number;
+  questions?: number;
+  timeLimit?: string;
+  attempts?: number;
+  passingScore?: number;
 }
 
 export function PracticeExamCard({
@@ -19,10 +19,10 @@ export function PracticeExamCard({
   title,
   description,
   price,
-  questions,
-  timeLimit,
-  attempts,
-  passingScore,
+  questions = 0,
+  timeLimit = 'TBD',
+  attempts = 1,
+  passingScore = 0,
 }: PracticeExamCardProps) {
   return (
     <Link href={`/practice-exams/${id}`} className="group">

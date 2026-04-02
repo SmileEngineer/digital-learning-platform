@@ -1,0 +1,156 @@
+import { readAuthError } from '@/lib/api';
+
+export type CourseAccessType = 'lifetime' | 'fixed_months';
+export type CourseStatus = 'draft' | 'published';
+export type UserRole = 'student' | 'admin' | 'staff' | 'super_admin';
+
+export type CourseSummary = {
+  id: string;
+  slug: string;
+  title: string;
+  shortDescription: string;
+  description: string;
+  instructorName: string;
+  imageUrl: string;
+  category: string;
+  stateName: string | null;
+  universityName: string | null;
+  semesterLabel: string | null;
+  price: number;
+  durationText: string;
+  rating: number;
+  tag: string | null;
+  totalLectures: number;
+  previewLectureCount: number;
+  accessType: CourseAccessType;
+  accessMonths: number | null;
+  studentsCount: number;
+  learningPoints: string[];
+  requirements: string[];
+  status: CourseStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CourseDetail = CourseSummary & {
+  hasAccess: boolean;
+  isPurchased: boolean;
+  accessExpiresAt: string | null;
+  sections: Array<{
+    id: string;
+    title: string;
+    position: number;
+    lectures: Array<{
+      id: string;
+      title: string;
+      durationText: string;
+      isPreview: boolean;
+    }>;
+  }>;
+};
+
+export type PurchasedCourse = CourseSummary & {
+  hasAccess: true;
+  isPurchased: true;
+  accessExpiresAt: string | null;
+  purchasedAt: string;
+  progressPercent: number;
+  completedLectures: number;
+};
+
+export type AdminCourseInput = {
+  slug?: string;
+  title: string;
+  shortDescription: string;
+  description: string;
+  instructorName: string;
+  imageUrl: string;
+  category: string;
+  stateName?: string | null;
+  universityName?: string | null;
+  semesterLabel?: string | null;
+  price: number;
+  durationText: string;
+  tag?: string | null;
+  previewLectureCount: number;
+  accessType: CourseAccessType;
+  accessMonths?: number | null;
+  status: CourseStatus;
+  learningPoints: string[];
+  requirements: string[];
+};
+
+async function parseJson<T>(res: Response): Promise<T> {
+  return (await res.json()) as T;
+}
+
+export async function fetchCourses(query?: { q?: string; category?: string }): Promise<CourseSummary[]> {
+  const params = new URLSearchParams();
+  if (query?.q) params.set('q', query.q);
+  if (query?.category && query.category !== 'All') params.set('category', query.category);
+  const res = await fetch(`/api/courses${params.size ? `?${params.toString()}` : ''}`, {
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(await readAuthError(res));
+  return (await parseJson<{ courses: CourseSummary[] }>(res)).courses;
+}
+
+export async function fetchCourseDetail(
+  slug: string
+): Promise<{ course: CourseDetail; relatedCourses: CourseSummary[] }> {
+  const res = await fetch(`/api/courses/${slug}`, {
+    credentials: 'include',
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(await readAuthError(res));
+  return parseJson<{ course: CourseDetail; relatedCourses: CourseSummary[] }>(res);
+}
+
+export async function purchaseCourse(slug: string): Promise<CourseDetail> {
+  const res = await fetch(`/api/courses/${slug}/purchase`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error(await readAuthError(res));
+  return (await parseJson<{ course: CourseDetail }>(res)).course;
+}
+
+export async function fetchMyCourses(): Promise<PurchasedCourse[]> {
+  const res = await fetch('/api/dashboard/courses', {
+    credentials: 'include',
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(await readAuthError(res));
+  return (await parseJson<{ courses: PurchasedCourse[] }>(res)).courses;
+}
+
+export async function fetchAdminCourses(): Promise<CourseSummary[]> {
+  const res = await fetch('/api/admin/courses', {
+    credentials: 'include',
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(await readAuthError(res));
+  return (await parseJson<{ courses: CourseSummary[] }>(res)).courses;
+}
+
+export async function createAdminCourse(input: AdminCourseInput): Promise<CourseSummary> {
+  const res = await fetch('/api/admin/courses', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await readAuthError(res));
+  return (await parseJson<{ course: CourseSummary }>(res)).course;
+}
+
+export async function updateAdminCourse(id: string, input: AdminCourseInput): Promise<CourseSummary> {
+  const res = await fetch(`/api/admin/courses/${id}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await readAuthError(res));
+  return (await parseJson<{ course: CourseSummary }>(res)).course;
+}

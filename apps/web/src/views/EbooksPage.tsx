@@ -1,73 +1,85 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { EbookCard } from '../components/EbookCard';
 import { CatalogFilterBanner } from '../components/CatalogFilterBanner';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { Button } from '../components/Button';
-
-const ebooks = [
-  {
-    id: '1',
-    title: 'The Complete Guide to Modern JavaScript',
-    description: 'Master ES6+ features, async programming, and modern JavaScript patterns.',
-    coverImage: 'https://images.unsplash.com/photo-1772617532657-2d0e38868716?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxib29rJTIwZWR1Y2F0aW9uJTIwa25vd2xlZGdlfGVufDF8fHx8MTc3NTA1ODMxMXww&ixlib=rb-4.1.0&q=80&w=1080',
-    price: 29.99,
-    pages: 450,
-    format: 'PDF',
-    downloadAllowed: true,
-    previewAvailable: true,
-    tags: ['New Release'],
-  },
-  {
-    id: '2',
-    title: 'Python for Data Analysis',
-    description: 'Comprehensive guide to data manipulation and analysis using pandas and NumPy.',
-    coverImage: 'https://images.unsplash.com/photo-1724148227179-807a0ca73774?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxlYm9vayUyMHJlYWRlciUyMGRpZ2l0YWx8ZW58MXx8fHwxNzc1MDU4MzEzfDA&ixlib=rb-4.1.0&q=80&w=1080',
-    price: 34.99,
-    pages: 520,
-    format: 'PDF',
-    downloadAllowed: true,
-    previewAvailable: true,
-  },
-  {
-    id: '3',
-    title: 'React Design Patterns',
-    description: 'Build scalable React applications with proven design patterns.',
-    coverImage: 'https://images.unsplash.com/photo-1772617532657-2d0e38868716?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxib29rJTIwZWR1Y2F0aW9uJTIwa25vd2xlZGdlfGVufDF8fHx8MTc3NTA1ODMxMXww&ixlib=rb-4.1.0&q=80&w=1080',
-    price: 27.99,
-    pages: 380,
-    format: 'PDF',
-    downloadAllowed: true,
-    previewAvailable: true,
-  },
-  {
-    id: '4',
-    title: 'Machine Learning Essentials',
-    description: 'Core concepts and algorithms in machine learning explained simply.',
-    coverImage: 'https://images.unsplash.com/photo-1724148227179-807a0ca73774?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxlYm9vayUyMHJlYWRlciUyMGRpZ2l0YWx8ZW58MXx8fHwxNzc1MDU4MzEzfDA&ixlib=rb-4.1.0&q=80&w=1080',
-    price: 39.99,
-    pages: 600,
-    format: 'PDF',
-    downloadAllowed: true,
-    previewAvailable: true,
-    tags: ['Bestseller'],
-  },
-];
-
-const categories = ['All', 'Programming', 'Data Science', 'Design', 'Business', 'Marketing'];
+import { fetchCatalogItems, type CatalogItem } from '@/lib/platform-api';
 
 export function EbooksPage() {
+  const [ebooks, setEbooks] = useState<CatalogItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  
+  const [sortBy, setSortBy] = useState('popular');
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        setLoading(true);
+        const items = await fetchCatalogItems('ebook');
+        if (!cancelled) {
+          setEbooks(items);
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Could not load ebooks.');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const categories = useMemo(
+    () => ['All', ...Array.from(new Set(ebooks.map((ebook) => ebook.category).filter(Boolean) as string[]))],
+    [ebooks]
+  );
+
+  const filtered = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const results = ebooks.filter((ebook) => {
+      const category = ebook.category ?? '';
+      const matchesCategory =
+        selectedCategory === 'All' || category.toLowerCase() === selectedCategory.toLowerCase();
+      const matchesQuery =
+        !query ||
+        ebook.title.toLowerCase().includes(query) ||
+        ebook.description.toLowerCase().includes(query) ||
+        ebook.instructor.toLowerCase().includes(query);
+      return matchesCategory && matchesQuery;
+    });
+
+    return results.sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          return b.title.localeCompare(a.title);
+        case 'price-asc':
+          return a.price - b.price;
+        case 'price-desc':
+          return b.price - a.price;
+        case 'popular':
+        default:
+          return b.students - a.students;
+      }
+    });
+  }, [ebooks, searchQuery, selectedCategory, sortBy]);
+
   return (
     <div className="py-8">
       <div className="container mx-auto px-4">
         <CatalogFilterBanner />
         <div className="mb-8">
           <h1 className="text-4xl mb-3">eBooks & PDFs</h1>
-          <p className="text-slate-600 text-lg">Download and read our extensive digital library</p>
+          <p className="text-slate-600 text-lg">Read online, unlock downloads, and preview pages before purchase.</p>
         </div>
         
         <div className="bg-white p-6 rounded-lg border border-slate-200 mb-8">
@@ -88,6 +100,16 @@ export function EbooksPage() {
               <SlidersHorizontal className="w-4 h-4 mr-2" />
               Filters
             </Button>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+            >
+              <option value="popular">Most Popular</option>
+              <option value="newest">Newest</option>
+              <option value="price-asc">Price: Low to High</option>
+              <option value="price-desc">Price: High to Low</option>
+            </select>
           </div>
           
           <div className="flex gap-2 mt-4 flex-wrap">
@@ -109,29 +131,40 @@ export function EbooksPage() {
         
         <div className="mb-6">
           <div className="flex items-center justify-between">
-            <p className="text-slate-600">{ebooks.length} ebooks found</p>
-            <select className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
-              <option>Most Popular</option>
-              <option>Newest</option>
-              <option>Price: Low to High</option>
-              <option>Price: High to Low</option>
-            </select>
+            <p className="text-slate-600">{loading ? 'Loading ebooks…' : `${filtered.length} ebooks found`}</p>
+            {error && <p className="text-sm text-red-600">{error}</p>}
           </div>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {ebooks.map((ebook) => (
-            <EbookCard key={ebook.id} {...ebook} />
-          ))}
-        </div>
-        
-        <div className="flex justify-center gap-2 mt-12">
-          <Button variant="outline" size="sm">Previous</Button>
-          <Button variant="primary" size="sm">1</Button>
-          <Button variant="outline" size="sm">2</Button>
-          <Button variant="outline" size="sm">3</Button>
-          <Button variant="outline" size="sm">Next</Button>
-        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="h-[24rem] rounded-lg border border-slate-200 bg-slate-100 animate-pulse" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-slate-600">
+            No ebooks matched your current filters.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {filtered.map((ebook) => (
+              <EbookCard
+                key={ebook.id}
+                id={ebook.slug}
+                title={ebook.title}
+                description={ebook.description}
+                coverImage={ebook.coverImage}
+                price={ebook.price}
+                pages={ebook.pages ?? 0}
+                format={ebook.format}
+                downloadAllowed={ebook.downloadAllowed}
+                previewAvailable={ebook.previewAvailable}
+                tags={ebook.tags}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

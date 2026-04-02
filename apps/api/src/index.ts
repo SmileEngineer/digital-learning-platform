@@ -3,6 +3,10 @@ import cors from 'cors';
 import express from 'express';
 import { neon } from '@neondatabase/serverless';
 import { createAuthRouter } from './routes/auth.js';
+import { createAdminCoursesRouter, createCoursesRouter, createMeRouter } from './routes/courses.js';
+import { createCatalogRouter } from './routes/catalog.js';
+import { createCheckoutRouter } from './routes/checkout.js';
+import { createLearnerRouter } from './routes/learner.js';
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
@@ -36,14 +40,27 @@ const dbUrl = process.env.DATABASE_URL;
 if (dbUrl) {
   const sql = neon(dbUrl);
   app.use('/auth', createAuthRouter(sql));
+  app.use('/courses', createCoursesRouter(sql));
+  app.use('/me', createMeRouter(sql));
+  app.use('/admin', createAdminCoursesRouter(sql));
+  app.use('/catalog', createCatalogRouter(sql));
+  app.use('/checkout', createCheckoutRouter(sql));
+  app.use('/learner', createLearnerRouter(sql));
 } else {
   console.warn('[api] DATABASE_URL is not set — auth routes return 503');
-  app.use('/auth', (_req, res) => {
+  const notReady = (_req: express.Request, res: express.Response) => {
     res.status(503).json({
       error:
-        'Auth is not configured: set DATABASE_URL on the API (e.g. Render environment variables) and redeploy.',
+        'The API is not configured: set DATABASE_URL on the API (e.g. Render environment variables) and redeploy.',
     });
-  });
+  };
+  app.use('/auth', notReady);
+  app.use('/courses', notReady);
+  app.use('/me', notReady);
+  app.use('/admin', notReady);
+  app.use('/catalog', notReady);
+  app.use('/checkout', notReady);
+  app.use('/learner', notReady);
 }
 
 app.get('/health', (_req, res) => {

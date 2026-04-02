@@ -1,5 +1,5 @@
-import { CourseDetailPage } from '@/views/CourseDetailPage';
+import { CourseDetailsPage } from '@/views/courses/CourseDetailsPage';
 
 export default function Page() {
-  return <CourseDetailPage />;
+  return <CourseDetailsPage />;
 }

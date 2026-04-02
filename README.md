@@ -90,6 +90,17 @@ The Next.js app (`apps/web`) and the Express API (`apps/api`) are separate proce
 | **Render**               | `JWT_SECRET`   | Long random string (required in production; e.g. `openssl rand -base64 32`)       |
 | **Render**               | `CORS_ORIGIN`  | `https://digital-learnhub.netlify.app` (comma-separated if you have more origins) |
 
+#### CORS on Render (no separate “CORS” screen)
+
+Render does **not** expose a CORS switch in the dashboard. This app enables CORS in Express using the **`CORS_ORIGIN`** environment variable.
+
+1. In [Render Dashboard](https://dashboard.render.com) open your **Web Service** (the Express API).
+2. Go to **Environment** (or **Environment → Environment Variables**).
+3. **Add** (or edit) **`CORS_ORIGIN`** = your Netlify site origin exactly, e.g. `https://digital-learnhub.netlify.app` (scheme + host, no path; no trailing slash).
+4. For multiple sites or previews, use commas: `https://digital-learnhub.netlify.app,https://deploy-preview-123--yoursite.netlify.app`.
+5. **Save** and **Manual Deploy → Clear build cache & deploy** is usually not needed for env-only changes—Render restarts the service when you save env vars.
+
+**Note:** Login from Netlify calls your API **from the Next.js server** (server-side `fetch`), not from the browser. So a broken login is usually **`API_URL` wrong or missing on Netlify**, the API down, or TLS/timeout—not CORS. CORS matters when the **browser** calls the API directly (e.g. future `fetch` to Render from `https://…netlify.app`).
 
 1. Run `**npm run db:migrate`** locally (or from CI) with `DATABASE_URL` pointing at the **same** Neon DB your Render API uses, so the `users` table exists in production.
 2. In **Netlify → Site configuration → Environment variables**, set `**API_URL`** to your Render API base URL (no trailing slash). **Redeploy** the site after saving—`API_URL` is read at runtime by the Next.js server, not baked into the client bundle.

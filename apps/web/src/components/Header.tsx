@@ -73,13 +73,23 @@ export function Header() {
 
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             {user && (
-              <Link
-                href="/dashboard"
-                className="hidden max-w-[10rem] truncate rounded-lg px-2 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 sm:inline-block"
-                title={user.name}
-              >
-                {user.name.split(/\s+/)[0]}
-              </Link>
+              <>
+                <Link
+                  href="/dashboard"
+                  className="hidden max-w-[10rem] truncate rounded-lg px-2 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 sm:inline-block"
+                  title={user.name}
+                >
+                  {user.name.split(/\s+/)[0]}
+                </Link>
+                {(user.role === 'admin' || user.role === 'super_admin') && (
+                  <Link
+                    href="/admin"
+                    className="hidden rounded-lg px-2 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 sm:inline-block"
+                  >
+                    Admin
+                  </Link>
+                )}
+              </>
             )}
             <Link
               href="/checkout"

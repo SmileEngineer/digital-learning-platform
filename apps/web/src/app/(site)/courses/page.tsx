@@ -1,10 +1,10 @@
 import { Suspense } from 'react';
-import { CoursesPage } from '@/views/CoursesPage';
+import { CoursesCatalogPage } from '@/views/courses/CoursesCatalogPage';
 
 export default function Page() {
   return (
     <Suspense fallback={null}>
-      <CoursesPage />
+      <CoursesCatalogPage />
     </Suspense>
   );
 }

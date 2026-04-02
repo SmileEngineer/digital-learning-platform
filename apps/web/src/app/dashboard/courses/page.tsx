@@ -1,5 +1,5 @@
-import { MyCoursesPage } from '@/views/dashboard/MyCoursesPage';
+import { MyCoursesRealPage } from '@/views/dashboard/MyCoursesRealPage';
 
 export default function Page() {
-  return <MyCoursesPage />;
+  return <MyCoursesRealPage />;
 }

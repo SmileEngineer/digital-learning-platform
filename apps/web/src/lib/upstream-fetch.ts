@@ -43,9 +43,17 @@ export async function fetchUpstream(
     if (code === 'ECONNREFUSED' || code === 'ENOTFOUND') {
       return { error: upstreamUnavailableMessage(), status: 503 };
     }
-    console.error('[upstream-fetch]', e);
+    const errMsg = e instanceof Error ? e.message : String(e);
+    const combined = `${errMsg} ${e instanceof Error && e.cause instanceof Error ? e.cause.message : ''}`;
+    console.error('[upstream-fetch]', url, e);
+    let hint =
+      'Set API_URL on Netlify to your Render API base URL (https://…, no trailing slash) and redeploy.';
+    if (/certificate|SSL|TLS|UNABLE_TO_VERIFY/i.test(combined)) {
+      hint =
+        'TLS error—use https:// in API_URL and the exact hostname from Render (e.g. …onrender.com).';
+    }
     return {
-      error: 'Could not reach the auth service. Check API_URL and that the API is running.',
+      error: `Could not reach the auth service at ${base}. ${hint} (CORS is configured on the API via CORS_ORIGIN in Render; it does not fix this error—this is usually a wrong URL, network, or TLS issue.)`,
       status: 503,
     };
   }

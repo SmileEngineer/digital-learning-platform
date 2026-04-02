@@ -9,8 +9,8 @@ interface LiveClassCardProps {
   description: string;
   image: string;
   price: number;
-  date: string;
-  time: string;
+  date?: string;
+  time?: string;
   duration: string;
   instructor: string;
   spotsLeft?: number;
@@ -22,8 +22,8 @@ export function LiveClassCard({
   description,
   image,
   price,
-  date,
-  time,
+  date = 'TBD',
+  time = 'TBD',
   duration,
   instructor,
   spotsLeft,

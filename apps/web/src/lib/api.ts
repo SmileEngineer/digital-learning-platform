@@ -1,4 +1,9 @@
-export type AuthUser = { id: string; email: string; name: string };
+export type AuthUser = {
+  id: string;
+  email: string;
+  name: string;
+  role: 'student' | 'admin' | 'staff' | 'super_admin';
+};
 
 export async function readAuthError(res: Response): Promise<string> {
   try {

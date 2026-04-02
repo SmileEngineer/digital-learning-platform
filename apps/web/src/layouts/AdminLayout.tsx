@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   LayoutDashboard,
   BookOpen,
@@ -32,6 +33,8 @@ const navItems = [
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, logout } = useAuth();
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -46,11 +49,16 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-4">
+            {user && <span className="text-xs text-slate-400">{user.name}</span>}
             <Link href="/" className="text-slate-300 hover:text-white text-sm">
               View Site
             </Link>
             <button
               type="button"
+              onClick={async () => {
+                await logout();
+                router.push('/');
+              }}
               className="flex items-center gap-2 text-slate-300 hover:text-white text-sm"
             >
               <LogOut className="w-4 h-4" />

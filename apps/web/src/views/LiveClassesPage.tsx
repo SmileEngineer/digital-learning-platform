@@ -1,47 +1,42 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
 import { LiveClassCard } from '../components/LiveClassCard';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { Button } from '../components/Button';
-
-const liveClasses = [
-  {
-    id: '1',
-    title: 'Advanced React Patterns Workshop',
-    description: 'Learn advanced React patterns including compound components, render props, and hooks.',
-    image: 'https://images.unsplash.com/photo-1766074903112-79661da9ab45?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsaXZlJTIwY2xhc3MlMjB3ZWJpbmFyJTIwdGVhY2hpbmd8ZW58MXx8fHwxNzc1MDU4MzEzfDA&ixlib=rb-4.1.0&q=80&w=1080',
-    price: 49.99,
-    date: 'April 15, 2026',
-    time: '2:00 PM EST',
-    duration: '3 hours',
-    instructor: 'Alex Thompson',
-    spotsLeft: 8,
-  },
-  {
-    id: '2',
-    title: 'Machine Learning Masterclass',
-    description: 'Deep dive into ML algorithms, neural networks, and practical implementations.',
-    image: 'https://images.unsplash.com/photo-1762330917056-e69b34329ddf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkaWdpdGFsJTIwY291cnNlJTIwdGVjaG5vbG9neXxlbnwxfHx8fDE3NzUwNTgzMTJ8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    price: 79.99,
-    date: 'April 18, 2026',
-    time: '10:00 AM EST',
-    duration: '4 hours',
-    instructor: 'Dr. Maria Rodriguez',
-    spotsLeft: 15,
-  },
-  {
-    id: '3',
-    title: 'UI/UX Design Sprint',
-    description: 'Interactive session on design thinking, prototyping, and user research.',
-    image: 'https://images.unsplash.com/photo-1621743018966-29194999d736?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB3b3Jrc3BhY2UlMjBkZXNrfGVufDF8fHx8MTc3NTA1Njk2MHww&ixlib=rb-4.1.0&q=80&w=1080',
-    price: 59.99,
-    date: 'April 22, 2026',
-    time: '1:00 PM EST',
-    duration: '3.5 hours',
-    instructor: 'Jessica Lee',
-    spotsLeft: 5,
-  },
-];
+import { fetchCatalogItems, type CatalogItem } from '@/lib/platform-api';
 
 export function LiveClassesPage() {
+  const [liveClasses, setLiveClasses] = useState<CatalogItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCatalogItems('live_class')
+      .then((items) => {
+        if (!cancelled) setLiveClasses(items);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load live classes');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return liveClasses;
+    return liveClasses.filter((item) =>
+      [item.title, item.description, item.instructor].some((value) => value.toLowerCase().includes(q))
+    );
+  }, [liveClasses, searchQuery]);
+
   return (
     <div className="py-8">
       <div className="container mx-auto px-4">
@@ -58,23 +53,27 @@ export function LiveClassesPage() {
                 <input
                   type="text"
                   placeholder="Search live classes..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-indigo-500"
                 />
               </div>
             </div>
             <Button variant="outline">
               <SlidersHorizontal className="w-4 h-4 mr-2" />
-              Filters
+              Backend filters coming next
             </Button>
           </div>
         </div>
         
         <div className="mb-6">
-          <p className="text-slate-600">{liveClasses.length} upcoming classes</p>
+          <p className="text-slate-600">{loading ? 'Loading live classes...' : `${filtered.length} upcoming classes`}</p>
         </div>
+
+        {error && <p className="mb-6 text-sm text-red-600">{error}</p>}
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {liveClasses.map((liveClass) => (
+          {filtered.map((liveClass) => (
             <LiveClassCard key={liveClass.id} {...liveClass} />
           ))}
         </div>
