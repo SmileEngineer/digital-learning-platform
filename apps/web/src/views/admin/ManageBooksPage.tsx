@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Edit, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
-import { Card } from '../../components/Card';
+import { AdminNotice, AdminPageHeader, AdminSectionCard } from '@/components/AdminPageChrome';
 import {
   createAdminBook,
   fetchAdminBook,
@@ -168,14 +168,17 @@ export function ManageBooksPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-3xl">Manage Physical Books</h1>
-          <p className="mt-2 text-slate-600">
-            Publish printed books, track stock availability, and control how bookstore titles appear in checkout.
-          </p>
-        </div>
-        <div className="flex gap-3">
+      <AdminPageHeader
+        title="Manage Physical Books"
+        description="Keep bookstore operations tidy with one clear workflow for inventory, shipping details, and checkout visibility."
+        stats={[
+          { label: 'Books', value: String(orderedItems.length) },
+          { label: 'Published', value: String(orderedItems.filter((item) => item.status === 'published').length), tone: 'success' },
+          { label: 'In Stock', value: String(orderedItems.filter((item) => (item.stock ?? 0) > 0).length), tone: 'info' },
+          { label: 'Editing', value: editingId ? '1 title' : 'None', tone: editingId ? 'warning' : 'default' },
+        ]}
+        actions={
+          <>
           <Button variant="outline" onClick={loadItems}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
@@ -184,16 +187,19 @@ export function ManageBooksPage() {
             <Plus className="w-4 h-4 mr-2" />
             New Book
           </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      {message && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>}
-      {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {message && <AdminNotice tone="success">{message}</AdminNotice>}
+      {error && <AdminNotice tone="error">{error}</AdminNotice>}
 
       <div className="grid gap-8 xl:grid-cols-[1.25fr,0.95fr]">
         <form onSubmit={handleSubmit}>
-          <Card>
-            <h2 className="text-2xl mb-6">{editingId ? 'Edit Book' : 'Create Book'}</h2>
+          <AdminSectionCard
+            title={editingId ? 'Edit Book' : 'Create Book'}
+            description="Organize all storefront, stock, and shipping metadata in a cleaner publishing form."
+          >
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block">
                 <span className="mb-2 block text-sm text-slate-700">Title</span>
@@ -260,11 +266,14 @@ export function ManageBooksPage() {
                 Reset
               </Button>
             </div>
-          </Card>
+          </AdminSectionCard>
         </form>
 
-        <Card>
-          <h2 className="text-2xl mb-4">Published Inventory</h2>
+        <AdminSectionCard
+          title="Inventory Library"
+          description="Quickly scan stock status and jump into editing without losing your place in the form."
+          className="xl:sticky xl:top-24 self-start"
+        >
           <div className="space-y-4">
             {loading ? (
               <p className="text-slate-600">Loading books…</p>
@@ -294,7 +303,7 @@ export function ManageBooksPage() {
               ))
             )}
           </div>
-        </Card>
+        </AdminSectionCard>
       </div>
     </div>
   );

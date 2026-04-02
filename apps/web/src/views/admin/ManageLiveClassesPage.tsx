@@ -5,6 +5,7 @@ import { CalendarClock, Edit, Plus, RefreshCw, RotateCcw } from 'lucide-react';
 import { Badge } from '@/components/Badge';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
+import { AdminNotice, AdminPageHeader, AdminSectionCard } from '@/components/AdminPageChrome';
 import {
   createAdminLiveClass,
   fetchAdminLiveClasses,
@@ -223,14 +224,17 @@ export function ManageLiveClassesPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl">Manage Live Classes</h1>
-          <p className="text-slate-600 mt-2">
-            Schedule, reschedule, cancel, and refund Google Meet based live classes from one panel.
-          </p>
-        </div>
-        <div className="flex gap-3">
+      <AdminPageHeader
+        title="Manage Live Classes"
+        description="Schedule, reschedule, cancel, and refund live class sessions from a cleaner operations workspace."
+        stats={[
+          { label: 'Classes', value: String(orderedItems.length) },
+          { label: 'Upcoming', value: String(orderedItems.filter((item) => item.liveClassStatus !== 'cancelled' && item.liveClassStatus !== 'completed').length), tone: 'info' },
+          { label: 'Cancelled', value: String(orderedItems.filter((item) => item.liveClassStatus === 'cancelled').length), tone: 'warning' },
+          { label: 'Editing', value: editingId ? '1 session' : 'None', tone: editingId ? 'warning' : 'default' },
+        ]}
+        actions={
+          <>
           <Button variant="outline" onClick={() => void loadItems()}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
@@ -239,14 +243,18 @@ export function ManageLiveClassesPage() {
             <Plus className="w-4 h-4 mr-2" />
             Schedule Class
           </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      <Card className="mb-8">
-        <h2 className="text-xl mb-4">{editingId ? 'Edit Live Class' : 'Create Live Class'}</h2>
-        {message && <p className="mb-4 text-sm text-green-700">{message}</p>}
-        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+      <div className="mt-8 space-y-8">
+        {message && <AdminNotice tone="success">{message}</AdminNotice>}
+        {error && <AdminNotice tone="error">{error}</AdminNotice>}
 
+      <AdminSectionCard
+        title={editingId ? 'Edit Live Class' : 'Create Live Class'}
+        description="Keep scheduling, meeting access, and cancellation settings in one tidy form."
+      >
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="block">
@@ -453,8 +461,12 @@ export function ManageLiveClassesPage() {
             </Button>
           </div>
         </form>
-      </Card>
+      </AdminSectionCard>
 
+      <AdminSectionCard
+        title="Scheduled Classes"
+        description="Monitor delivery status and reopen any live class edit or refund action from one list."
+      >
       <div className="space-y-4">
         {loading ? (
           Array.from({ length: 3 }).map((_, index) => (
@@ -525,6 +537,8 @@ export function ManageLiveClassesPage() {
             </Card>
           ))
         )}
+      </div>
+      </AdminSectionCard>
       </div>
     </div>
   );

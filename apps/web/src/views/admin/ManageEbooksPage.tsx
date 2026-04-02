@@ -5,6 +5,7 @@ import { Edit, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
 import { Card } from '../../components/Card';
+import { AdminNotice, AdminPageHeader, AdminSectionCard } from '@/components/AdminPageChrome';
 import {
   createAdminEbook,
   fetchAdminEbook,
@@ -196,14 +197,17 @@ export function ManageEbooksPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-3xl">Manage eBooks</h1>
-          <p className="mt-2 text-slate-600">
-            Configure preview pages, online reader protection, watermark download messaging, and page content.
-          </p>
-        </div>
-        <div className="flex gap-3">
+      <AdminPageHeader
+        title="Manage eBooks"
+        description="Publish eBooks with a cleaner editing flow for preview limits, protected reading, and watermarked downloads."
+        stats={[
+          { label: 'eBooks', value: String(orderedItems.length) },
+          { label: 'Published', value: String(orderedItems.filter((item) => item.status === 'published').length), tone: 'success' },
+          { label: 'Downloadable', value: String(orderedItems.filter((item) => item.downloadAllowed).length), tone: 'info' },
+          { label: 'Editing', value: editingId ? '1 title' : 'None', tone: editingId ? 'warning' : 'default' },
+        ]}
+        actions={
+          <>
           <Button variant="outline" onClick={loadItems}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
@@ -212,25 +216,31 @@ export function ManageEbooksPage() {
             <Plus className="w-4 h-4 mr-2" />
             New eBook
           </Button>
-        </div>
-      </div>
-
-      {message && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>}
-      {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+          </>
+        }
+      />
+      
+      {message && <AdminNotice tone="success">{message}</AdminNotice>}
+      {error && <AdminNotice tone="error">{error}</AdminNotice>}
 
       <div className="grid gap-8 xl:grid-cols-[1.3fr,0.9fr]">
         <form onSubmit={handleSubmit}>
-          <Card>
-            <div className="flex items-center justify-between mb-6">
+          <AdminSectionCard
+            title={editingId ? 'Edit eBook' : 'Create eBook'}
+            description="Structure reader content and purchase behavior without the page feeling overloaded."
+            badge={
+              editingId ? (
+                <Badge variant={form.status === 'published' ? 'success' : 'warning'}>{form.status}</Badge>
+              ) : undefined
+            }
+          >
+            <div className="mb-6 flex items-center justify-between">
               <div>
-                <h2 className="text-2xl">{editingId ? 'Edit eBook' : 'Create eBook'}</h2>
-                <p className="text-sm text-slate-600 mt-1">
+                <h3 className="text-lg font-medium text-slate-900">{editingId ? 'Active editing session' : 'New publishing draft'}</h3>
+                <p className="mt-1 text-sm text-slate-600">
                   Add structured page content so readers can preview before purchase and read the full watermarked copy after purchase.
                 </p>
               </div>
-              {editingId && (
-                <Badge variant={form.status === 'published' ? 'success' : 'warning'}>{form.status}</Badge>
-              )}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -472,12 +482,14 @@ export function ManageEbooksPage() {
                 Reset
               </Button>
             </div>
-          </Card>
+          </AdminSectionCard>
         </form>
 
-        <div className="space-y-6">
-          <Card>
-            <h2 className="text-2xl mb-4">Existing eBooks</h2>
+        <div className="space-y-6 xl:sticky xl:top-24 self-start">
+          <AdminSectionCard
+            title="eBook Library"
+            description="Review recently added titles and reopen any draft from a cleaner side panel."
+          >
             <div className="space-y-4">
               {loading ? (
                 <p className="text-slate-600">Loading ebooks…</p>
@@ -516,7 +528,7 @@ export function ManageEbooksPage() {
                 ))
               )}
             </div>
-          </Card>
+          </AdminSectionCard>
         </div>
       </div>
     </div>

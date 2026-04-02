@@ -5,6 +5,7 @@ import { Edit, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/Badge';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
+import { AdminNotice, AdminPageHeader, AdminSectionCard } from '@/components/AdminPageChrome';
 import {
   createAdminCourse,
   fetchAdminCourse,
@@ -296,14 +297,17 @@ export function CourseManagementPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl">Manage Courses</h1>
-          <p className="text-slate-600 mt-2">
-            Manage course curriculum, preview lectures, lecture videos, quizzes, and access validity.
-          </p>
-        </div>
-        <div className="flex gap-3">
+      <AdminPageHeader
+        title="Manage Courses"
+        description="Keep the curriculum builder and publishing workflow easier to scan with a clearer course authoring workspace."
+        stats={[
+          { label: 'Courses', value: String(sortedCourses.length) },
+          { label: 'Published', value: String(sortedCourses.filter((course) => course.status === 'published').length), tone: 'success' },
+          { label: 'Lectures', value: String(totalLectures), tone: 'info' },
+          { label: 'Preview', value: String(previewLectureCount), tone: 'warning' },
+        ]}
+        actions={
+          <>
           <Button variant="outline" onClick={() => void loadCourses()}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
@@ -312,13 +316,17 @@ export function CourseManagementPage() {
             <Plus className="w-4 h-4 mr-2" />
             New Course
           </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      <Card className="mb-8">
-        <h2 className="text-xl mb-4">{editingId ? 'Edit Course' : 'Create Course'}</h2>
-        {message && <p className="mb-4 text-sm text-green-700">{message}</p>}
-        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+      <div className="mt-8 space-y-8">
+      {message && <AdminNotice tone="success">{message}</AdminNotice>}
+      {error && <AdminNotice tone="error">{error}</AdminNotice>}
+      <AdminSectionCard
+        title={editingId ? 'Edit Course' : 'Create Course'}
+        description="Shape structure, access rules, and curriculum details from one consistent course editor."
+      >
         <div className="mb-4 flex flex-wrap gap-3 text-sm text-slate-600">
           <span>{totalLectures} total lectures</span>
           <span>•</span>
@@ -790,9 +798,13 @@ export function CourseManagementPage() {
             </Button>
           </div>
         </form>
-      </Card>
+      </AdminSectionCard>
 
-      <Card padding="none">
+      <AdminSectionCard
+        title="Course Library"
+        description="Review all courses in a cleaner table and jump back into editing without losing context."
+        className="overflow-hidden"
+      >
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
@@ -856,7 +868,8 @@ export function CourseManagementPage() {
             </tbody>
           </table>
         </div>
-      </Card>
+      </AdminSectionCard>
+      </div>
     </div>
   );
 }

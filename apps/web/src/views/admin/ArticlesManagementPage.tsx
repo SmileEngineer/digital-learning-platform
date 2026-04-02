@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
-import { Card } from '../../components/Card';
 import { Edit, Plus, RefreshCw } from 'lucide-react';
+import { AdminNotice, AdminPageHeader, AdminSectionCard } from '@/components/AdminPageChrome';
 import {
   createAdminArticle,
   fetchAdminArticle,
@@ -157,12 +157,17 @@ export function ArticlesManagementPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-3xl">Articles Management</h1>
-          <p className="mt-2 text-slate-600">Publish read-only articles with long-form content and optional video links.</p>
-        </div>
-        <div className="flex gap-3">
+      <AdminPageHeader
+        title="Articles Management"
+        description="Publish editorial content with a cleaner split between writing, scheduling, and reviewing live articles."
+        stats={[
+          { label: 'Articles', value: String(orderedItems.length) },
+          { label: 'Published', value: String(orderedItems.filter((item) => item.status === 'published').length), tone: 'success' },
+          { label: 'Featured', value: String(orderedItems.filter((item) => item.featured).length), tone: 'info' },
+          { label: 'Editing', value: editingId ? '1 article' : 'None', tone: editingId ? 'warning' : 'default' },
+        ]}
+        actions={
+          <>
           <Button variant="outline" onClick={() => void loadItems()}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
@@ -171,16 +176,19 @@ export function ArticlesManagementPage() {
             <Plus className="w-4 h-4 mr-2" />
             New Article
           </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      {message && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>}
-      {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {message && <AdminNotice tone="success">{message}</AdminNotice>}
+      {error && <AdminNotice tone="error">{error}</AdminNotice>}
 
       <div className="grid gap-8 xl:grid-cols-[1.15fr,0.85fr]">
         <form onSubmit={handleSubmit}>
-          <Card>
-            <h2 className="text-2xl mb-6">{editingId ? 'Edit Article' : 'Create Article'}</h2>
+          <AdminSectionCard
+            title={editingId ? 'Edit Article' : 'Create Article'}
+            description="Write, schedule, and promote article content from a single structured editing area."
+          >
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block">
                 <span className="mb-2 block text-sm text-slate-700">Title</span>
@@ -243,11 +251,14 @@ export function ArticlesManagementPage() {
                 Reset
               </Button>
             </div>
-          </Card>
+          </AdminSectionCard>
         </form>
 
-        <Card>
-          <h2 className="text-2xl mb-4">Published Articles</h2>
+        <AdminSectionCard
+          title="Article Library"
+          description="Browse published and draft entries with the most recent stories always easy to find."
+          className="xl:sticky xl:top-24 self-start"
+        >
           <div className="space-y-4">
             {loading ? (
               <p className="text-slate-600">Loading articles…</p>
@@ -278,7 +289,7 @@ export function ArticlesManagementPage() {
               ))
             )}
           </div>
-        </Card>
+        </AdminSectionCard>
       </div>
     </div>
   );
