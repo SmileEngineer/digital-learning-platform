@@ -7,6 +7,7 @@ export type SessionUser = {
   email: string;
   name: string;
   role: UserRole;
+  admin_permissions?: string[];
 };
 
 export function parseBearer(req: Request): string | null {
@@ -26,7 +27,7 @@ export async function getSessionUser(
   if (!payload) return null;
 
   const rows = await sql`
-    SELECT id, email, name, role
+    SELECT id, email, name, role, admin_permissions
     FROM users
     WHERE id = ${payload.sub}
     LIMIT 1
@@ -57,7 +58,7 @@ export async function requireAdminUser(
 ): Promise<SessionUser | null> {
   const user = await requireSessionUser(sql, req, res);
   if (!user) return null;
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'staff' && user.role !== 'admin' && user.role !== 'super_admin') {
     res.status(403).json({ error: 'Admin access is required.' });
     return null;
   }

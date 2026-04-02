@@ -8,6 +8,11 @@ import { DollarSign, Eye, Settings, Users, Video } from 'lucide-react';
 import { fetchAdminAnalytics, fetchSiteSettings, updateSiteSettings, type AdminAnalyticsSummary, type SiteSettings } from '@/lib/platform-api';
 import { useAuth } from '@/contexts/AuthContext';
 
+function hasPermission(user: { role: string; adminPermissions?: string[] } | null, permission: string): boolean {
+  if (!user) return false;
+  return user.role === 'super_admin' || (user.adminPermissions ?? []).includes(permission);
+}
+
 export function AdminDashboardPage() {
   const { user } = useAuth();
   const [analytics, setAnalytics] = useState<AdminAnalyticsSummary | null>(null);
@@ -15,14 +20,19 @@ export function AdminDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const canViewAnalytics = hasPermission(user, 'analytics');
+  const canManageSettings = hasPermission(user, 'settings');
+  const canManageAdminAccess = hasPermission(user, 'admin_access');
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
         const [analyticsData, settingsData] = await Promise.all([
-          fetchAdminAnalytics().catch(() => null),
-          fetchSiteSettings().catch(() => ({ homeScrollerEnabled: false, homeScrollerMessage: '' })),
+          canViewAnalytics ? fetchAdminAnalytics().catch(() => null) : Promise.resolve(null),
+          canManageSettings
+            ? fetchSiteSettings().catch(() => ({ homeScrollerEnabled: false, homeScrollerMessage: '' }))
+            : Promise.resolve({ homeScrollerEnabled: false, homeScrollerMessage: '' }),
         ]);
         if (!cancelled) {
           setAnalytics(analyticsData);
@@ -37,9 +47,10 @@ export function AdminDashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [canManageSettings, canViewAnalytics]);
 
   async function handleSaveSettings() {
+    if (!canManageSettings) return;
     try {
       setSaving(true);
       const updated = await updateSiteSettings(settings);
@@ -72,77 +83,101 @@ export function AdminDashboardPage() {
       {message && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>}
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        {cards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <Card key={card.label}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-slate-600">{card.label}</span>
-                <Icon className="w-5 h-5 text-indigo-600" />
-              </div>
-              <div className="text-3xl">{card.value}</div>
-            </Card>
-          );
-        })}
-      </div>
+      {canViewAnalytics && (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+          {cards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <Card key={card.label}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-600">{card.label}</span>
+                  <Icon className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div className="text-3xl">{card.value}</div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <div className="flex items-center gap-2 mb-4">
-            <Settings className="w-5 h-5 text-indigo-600" />
-            <h2 className="text-xl">Home Page Scroller</h2>
-          </div>
-          <label className="inline-flex items-center gap-2 text-sm mb-4">
-            <input
-              type="checkbox"
-              checked={settings.homeScrollerEnabled}
-              onChange={(e) => setSettings((current) => ({ ...current, homeScrollerEnabled: e.target.checked }))}
+        {canManageSettings ? (
+          <Card>
+            <div className="flex items-center gap-2 mb-4">
+              <Settings className="w-5 h-5 text-indigo-600" />
+              <h2 className="text-xl">Home Page Scroller</h2>
+            </div>
+            <label className="inline-flex items-center gap-2 text-sm mb-4">
+              <input
+                type="checkbox"
+                checked={settings.homeScrollerEnabled}
+                onChange={(e) => setSettings((current) => ({ ...current, homeScrollerEnabled: e.target.checked }))}
+              />
+              Enable home page scroller
+            </label>
+            <textarea
+              value={settings.homeScrollerMessage}
+              onChange={(e) => setSettings((current) => ({ ...current, homeScrollerMessage: e.target.value }))}
+              rows={4}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2"
+              placeholder="Enter the global scrolling message for all site visitors"
             />
-            Enable home page scroller
-          </label>
-          <textarea
-            value={settings.homeScrollerMessage}
-            onChange={(e) => setSettings((current) => ({ ...current, homeScrollerMessage: e.target.value }))}
-            rows={4}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            placeholder="Enter the global scrolling message for all site visitors"
-          />
-          <div className="mt-4">
-            <Button onClick={() => void handleSaveSettings()} disabled={saving}>
-              {saving ? 'Saving…' : 'Save Scroller Settings'}
-            </Button>
-          </div>
-        </Card>
+            <div className="mt-4">
+              <Button onClick={() => void handleSaveSettings()} disabled={saving}>
+                {saving ? 'Saving…' : 'Save Scroller Settings'}
+              </Button>
+            </div>
+          </Card>
+        ) : (
+          <Card>
+            <div className="flex items-center gap-2 mb-4">
+              <Settings className="w-5 h-5 text-indigo-600" />
+              <h2 className="text-xl">Your Admin Access</h2>
+            </div>
+            <p className="text-sm text-slate-600">
+              Your role is active, but site-wide settings are limited to admins with the `settings` permission.
+            </p>
+          </Card>
+        )}
 
         <Card>
           <h2 className="text-xl mb-4">Quick Insights</h2>
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span>New registrations (30d)</span>
-              <span>{analytics?.totals.newRegistrations ?? 0}</span>
+          {canViewAnalytics ? (
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span>New registrations (30d)</span>
+                <span>{analytics?.totals.newRegistrations ?? 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Live visitors</span>
+                <span>{analytics?.traffic.liveVisitors ?? 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Daily visitors</span>
+                <span>{analytics?.traffic.dailyVisitors ?? 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Monthly visitors</span>
+                <span>{analytics?.traffic.monthlyVisitors ?? 0}</span>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span>Live visitors</span>
-              <span>{analytics?.traffic.liveVisitors ?? 0}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Daily visitors</span>
-              <span>{analytics?.traffic.dailyVisitors ?? 0}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Monthly visitors</span>
-              <span>{analytics?.traffic.monthlyVisitors ?? 0}</span>
-            </div>
-          </div>
+          ) : (
+            <p className="text-sm text-slate-600">
+              Analytics summaries are available to admins with the `analytics` permission.
+            </p>
+          )}
           <div className="mt-6 space-y-2">
-            <Link href="/admin/analytics" className="block text-sm text-indigo-600 hover:underline">
-              View full analytics
-            </Link>
-            <Link href="/admin/coupons" className="block text-sm text-indigo-600 hover:underline">
-              Manage coupons
-            </Link>
-            {user?.role === 'super_admin' || user?.adminPermissions?.includes('admin_access') ? (
+            {hasPermission(user, 'analytics') ? (
+              <Link href="/admin/analytics" className="block text-sm text-indigo-600 hover:underline">
+                View full analytics
+              </Link>
+            ) : null}
+            {hasPermission(user, 'coupons') ? (
+              <Link href="/admin/coupons" className="block text-sm text-indigo-600 hover:underline">
+                Manage coupons
+              </Link>
+            ) : null}
+            {canManageAdminAccess ? (
               <Link href="/admin/admin-access" className="block text-sm text-indigo-600 hover:underline">
                 Manage admin access
               </Link>

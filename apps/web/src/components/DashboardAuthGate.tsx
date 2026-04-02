@@ -1,18 +1,28 @@
 'use client';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+
+function isAdminRole(role: string | undefined): boolean {
+  return role === 'staff' || role === 'admin' || role === 'super_admin';
+}
 
 export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (loading) return;
+    if (!user) {
       router.replace('/login?next=/dashboard');
+      return;
     }
-  }, [loading, user, router]);
+    if (isAdminRole(user.role)) {
+      router.replace('/admin');
+    }
+  }, [loading, pathname, router, user]);
 
   if (loading) {
     return (
@@ -22,7 +32,7 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user) {
+  if (!user || isAdminRole(user.role)) {
     return null;
   }
 

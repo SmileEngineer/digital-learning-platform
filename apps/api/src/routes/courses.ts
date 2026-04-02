@@ -2,10 +2,10 @@ import { Router } from 'express';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import {
   getSessionUser,
-  requireAdminUser,
   requireSessionUser,
   type SessionUser,
 } from '../auth/request-user.js';
+import { requireAdminPermission } from '../auth/session.js';
 
 type DbCourseRow = {
   id: string;
@@ -124,7 +124,7 @@ type CourseSectionDto = {
 };
 
 function isAdminRole(role: SessionUser['role'] | null | undefined): boolean {
-  return role === 'admin' || role === 'super_admin';
+  return role === 'staff' || role === 'admin' || role === 'super_admin';
 }
 
 function toStringArray(value: unknown): string[] {
@@ -1003,7 +1003,7 @@ export function createAdminCoursesRouter(sql: NeonQueryFunction<false, false>): 
 
   router.get('/courses', async (req, res) => {
     try {
-      const user = await requireAdminUser(sql, req, res);
+      const user = await requireAdminPermission(req, res, sql, 'courses');
       if (!user) return;
 
       const rows = await listCourses(sql, { includeDrafts: true });
@@ -1016,7 +1016,7 @@ export function createAdminCoursesRouter(sql: NeonQueryFunction<false, false>): 
 
   router.get('/courses/:id', async (req, res) => {
     try {
-      const user = await requireAdminUser(sql, req, res);
+      const user = await requireAdminPermission(req, res, sql, 'courses');
       if (!user) return;
 
       const course = await getAdminCourseDetail(sql, req.params.id);
@@ -1034,7 +1034,7 @@ export function createAdminCoursesRouter(sql: NeonQueryFunction<false, false>): 
 
   router.post('/courses', async (req, res) => {
     try {
-      const user = await requireAdminUser(sql, req, res);
+      const user = await requireAdminPermission(req, res, sql, 'courses');
       if (!user) return;
 
       const body = req.body as Record<string, unknown>;
@@ -1113,7 +1113,7 @@ export function createAdminCoursesRouter(sql: NeonQueryFunction<false, false>): 
 
   router.patch('/courses/:id', async (req, res) => {
     try {
-      const user = await requireAdminUser(sql, req, res);
+      const user = await requireAdminPermission(req, res, sql, 'courses');
       if (!user) return;
 
       const existing = await getCourseById(sql, req.params.id);

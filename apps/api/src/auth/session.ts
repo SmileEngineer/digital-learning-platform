@@ -28,7 +28,7 @@ export const ADMIN_PERMISSION_KEYS = [
 export type AdminPermission = (typeof ADMIN_PERMISSION_KEYS)[number];
 
 function isAdminRole(role: string): boolean {
-  return role === 'admin' || role === 'super_admin';
+  return role === 'staff' || role === 'admin' || role === 'super_admin';
 }
 
 export function hasAdminPermission(user: SessionUser, permission: AdminPermission): boolean {

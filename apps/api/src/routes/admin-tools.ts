@@ -159,10 +159,11 @@ function parseAdminUserInput(body: Record<string, unknown>) {
   const email = parseOptionalString(body.email)?.toLowerCase();
   const name = parseOptionalString(body.name);
   const password = typeof body.password === 'string' ? body.password : '';
-  const role = body.role === 'super_admin' ? 'super_admin' : body.role === 'admin' ? 'admin' : null;
+  const role =
+    body.role === 'super_admin' ? 'super_admin' : body.role === 'admin' ? 'admin' : body.role === 'staff' ? 'staff' : null;
   if (!email) return { error: 'Email is required.' };
   if (!name) return { error: 'Name is required.' };
-  if (!role) return { error: 'Role must be admin or super_admin.' };
+  if (!role) return { error: 'Role must be staff, admin, or super_admin.' };
   if (password.length > 0 && password.length < 8) return { error: 'Password must be at least 8 characters.' };
   return {
     data: {
@@ -685,7 +686,7 @@ export function createAdminToolsRouter(sql: NeonQueryFunction<false, false>): Ro
       const rows = (await sql`
         SELECT id, email, name, role, admin_permissions, created_at
         FROM users
-        WHERE role IN ('admin', 'super_admin')
+        WHERE role IN ('staff', 'admin', 'super_admin')
         ORDER BY created_at DESC
       `) as AdminUserRow[];
       res.json({ items: rows.map(mapAdminUser), permissions: ADMIN_PERMISSION_KEYS });
@@ -753,7 +754,7 @@ export function createAdminToolsRouter(sql: NeonQueryFunction<false, false>): Ro
           admin_permissions = ${input.permissions},
           password_hash = COALESCE(${passwordHash}, password_hash)
         WHERE id = ${req.params.id}
-          AND role IN ('admin', 'super_admin')
+          AND role IN ('staff', 'admin', 'super_admin')
         RETURNING id, email, name, role, admin_permissions, created_at
       `) as AdminUserRow[];
       if (rows.length === 0) {
@@ -804,7 +805,7 @@ export function createCatalogArticlesRouter(sql: NeonQueryFunction<false, false>
       }
       const referrer = parseOptionalString(body.referrer);
       const user = await getSessionUser(req, sql);
-      const visitorType = user ? (user.role === 'admin' || user.role === 'super_admin' ? 'admin' : 'registered') : 'guest';
+      const visitorType = user ? (user.role === 'staff' || user.role === 'admin' || user.role === 'super_admin' ? 'admin' : 'registered') : 'guest';
       await sql`
         INSERT INTO site_visits (user_id, path, referrer, visitor_type)
         VALUES (${user?.id ?? null}, ${path}, ${referrer}, ${visitorType})

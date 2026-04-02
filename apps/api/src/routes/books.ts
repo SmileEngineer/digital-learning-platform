@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import { mapCatalogItem, type CatalogItemRow } from '../platform.js';
-import { requireAdminUser } from '../auth/session.js';
+import { requireAdminPermission } from '../auth/session.js';
 import { buildDtdcTrackingUrl, lookupDeliveryAvailability } from '../shipping.js';
 
 type BookMetadata = {
@@ -314,7 +314,7 @@ export function createAdminBooksRouter(sql: NeonQueryFunction<false, false>): Ro
 
   router.get('/books', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'books');
       if (!user) return;
       const items = await listBooks(sql);
       res.json({ items: items.map(toAdminBook) });
@@ -326,7 +326,7 @@ export function createAdminBooksRouter(sql: NeonQueryFunction<false, false>): Ro
 
   router.get('/books/:id', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'books');
       if (!user) return;
       const item = await getBookById(sql, req.params.id);
       if (!item) {
@@ -342,7 +342,7 @@ export function createAdminBooksRouter(sql: NeonQueryFunction<false, false>): Ro
 
   router.post('/books', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'books');
       if (!user) return;
       const parsed = parseBookInput((req.body ?? {}) as Record<string, unknown>);
       if (!parsed.data) {
@@ -400,7 +400,7 @@ export function createAdminBooksRouter(sql: NeonQueryFunction<false, false>): Ro
 
   router.patch('/books/:id', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'books');
       if (!user) return;
       const existing = await getBookById(sql, req.params.id);
       if (!existing) {
@@ -447,7 +447,7 @@ export function createAdminBooksRouter(sql: NeonQueryFunction<false, false>): Ro
 
   router.get('/orders/shipments', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'orders');
       if (!user) return;
       const rows = await listShipments(sql);
       res.json({ items: rows.map(mapShipment) });
@@ -459,7 +459,7 @@ export function createAdminBooksRouter(sql: NeonQueryFunction<false, false>): Ro
 
   router.get('/orders/shipments/export', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'orders');
       if (!user) return;
       const rows = (await listShipments(sql)).map(mapShipment);
       const csv = toCsv(rows);
@@ -473,7 +473,7 @@ export function createAdminBooksRouter(sql: NeonQueryFunction<false, false>): Ro
 
   router.patch('/orders/shipments/:id', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'orders');
       if (!user) return;
 
       const rows = (await sql`

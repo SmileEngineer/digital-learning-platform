@@ -36,7 +36,7 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
       router.replace('/login?next=/admin');
       return;
     }
-    if (user.role !== 'admin' && user.role !== 'super_admin') {
+    if (user.role !== 'staff' && user.role !== 'admin' && user.role !== 'super_admin') {
       router.replace('/dashboard');
       return;
     }
@@ -53,7 +53,11 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user || (user.role !== 'admin' && user.role !== 'super_admin') || !canAccessAdminPath(pathname, user)) {
+  if (
+    !user ||
+    (user.role !== 'staff' && user.role !== 'admin' && user.role !== 'super_admin') ||
+    !canAccessAdminPath(pathname, user)
+  ) {
     return null;
   }
 

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import { notifyUser } from '../notifications.js';
 import { mapCatalogItem, type CatalogItemRow } from '../platform.js';
-import { requireAdminUser, requireSessionUser } from '../auth/session.js';
+import { requireAdminPermission, requireSessionUser } from '../auth/session.js';
 
 type QuestionType = 'multiple_choice' | 'single_select' | 'fill_blank';
 
@@ -435,7 +435,7 @@ export function createAdminPracticeExamsRouter(sql: NeonQueryFunction<false, fal
 
   router.get('/practice-exams', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'practice_exams');
       if (!user) return;
       const items = await listAdminPracticeExams(sql);
       const withQuestions = await Promise.all(
@@ -450,7 +450,7 @@ export function createAdminPracticeExamsRouter(sql: NeonQueryFunction<false, fal
 
   router.get('/practice-exams/:id', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'practice_exams');
       if (!user) return;
       const item = await getAdminPracticeExamById(sql, req.params.id);
       if (!item) {
@@ -467,7 +467,7 @@ export function createAdminPracticeExamsRouter(sql: NeonQueryFunction<false, fal
 
   router.post('/practice-exams', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'practice_exams');
       if (!user) return;
       const parsed = parseExamInput((req.body ?? {}) as Record<string, unknown>);
       if (!parsed.data) {
@@ -530,7 +530,7 @@ export function createAdminPracticeExamsRouter(sql: NeonQueryFunction<false, fal
 
   router.patch('/practice-exams/:id', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'practice_exams');
       if (!user) return;
       const existing = await getAdminPracticeExamById(sql, req.params.id);
       if (!existing) {

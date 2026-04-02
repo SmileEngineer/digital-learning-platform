@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import { notifyUser } from '../notifications.js';
 import { mapCatalogItem, type CatalogItemRow } from '../platform.js';
-import { requireAdminUser, requireSessionUser } from '../auth/session.js';
+import { requireAdminPermission, requireSessionUser } from '../auth/session.js';
 
 type LiveClassStatus = 'scheduled' | 'rescheduled' | 'cancelled' | 'completed';
 
@@ -340,7 +340,7 @@ export function createAdminLiveClassesRouter(sql: NeonQueryFunction<false, false
 
   router.get('/live-classes', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'live_classes');
       if (!user) return;
 
       const rows = await listLiveClasses(sql);
@@ -353,7 +353,7 @@ export function createAdminLiveClassesRouter(sql: NeonQueryFunction<false, false
 
   router.post('/live-classes', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'live_classes');
       if (!user) return;
 
       const parsed = parseLiveClassInput((req.body ?? {}) as Record<string, unknown>);
@@ -429,7 +429,7 @@ export function createAdminLiveClassesRouter(sql: NeonQueryFunction<false, false
 
   router.patch('/live-classes/:id', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'live_classes');
       if (!user) return;
 
       const current = await getLiveClassById(sql, req.params.id);
@@ -542,7 +542,7 @@ export function createAdminLiveClassesRouter(sql: NeonQueryFunction<false, false
 
   router.post('/live-classes/:id/refund', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'orders');
       if (!user) return;
 
       const current = await getLiveClassById(sql, req.params.id);

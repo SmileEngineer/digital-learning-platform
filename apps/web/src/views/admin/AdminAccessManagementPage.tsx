@@ -15,7 +15,7 @@ type FormState = {
   email: string;
   name: string;
   password: string;
-  role: 'admin' | 'super_admin';
+  role: 'staff' | 'admin' | 'super_admin';
   permissions: string[];
 };
 
@@ -24,7 +24,7 @@ function createEmptyForm(): FormState {
     email: '',
     name: '',
     password: '',
-    role: 'admin',
+    role: 'staff',
     permissions: [],
   };
 }
@@ -129,6 +129,7 @@ export function AdminAccessManagementPage() {
               <label className="block">
                 <span className="mb-2 block text-sm text-slate-700">Role</span>
                 <select value={form.role} onChange={(e) => setForm((c) => ({ ...c, role: e.target.value as FormState['role'] }))} className="w-full rounded-lg border border-slate-300 px-3 py-2">
+                  <option value="staff">Staff</option>
                   <option value="admin">Admin</option>
                   <option value="super_admin">Super Admin</option>
                 </select>
@@ -175,7 +176,7 @@ export function AdminAccessManagementPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="flex gap-2 mb-2 flex-wrap">
-                      <Badge variant={item.role === 'super_admin' ? 'warning' : 'info'}>{item.role}</Badge>
+                      <Badge variant={item.role === 'super_admin' ? 'warning' : item.role === 'admin' ? 'info' : 'neutral'}>{item.role}</Badge>
                       {item.permissions.slice(0, 3).map((permission) => (
                         <Badge key={permission} variant="neutral">
                           {permission}

@@ -292,7 +292,7 @@ export type AdminUserAccess = {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'super_admin';
+  role: 'staff' | 'admin' | 'super_admin';
   permissions: string[];
   createdAt: string;
 };
@@ -777,7 +777,7 @@ export async function createAdminUserAccess(input: {
   email: string;
   name: string;
   password: string;
-  role: 'admin' | 'super_admin';
+  role: 'staff' | 'admin' | 'super_admin';
   permissions: string[];
 }): Promise<AdminUserAccess> {
   const data = await postJson<{ item: AdminUserAccess }>('/api/platform/admin/admin-users', input);
@@ -790,7 +790,7 @@ export async function updateAdminUserAccess(
     email: string;
     name: string;
     password?: string;
-    role: 'admin' | 'super_admin';
+    role: 'staff' | 'admin' | 'super_admin';
     permissions: string[];
   }
 ): Promise<AdminUserAccess> {

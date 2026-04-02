@@ -55,7 +55,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-4">
-            {user && <span className="text-xs text-slate-400">{user.name}</span>}
+            {user && <span className="text-xs text-slate-400">{user.name} • {user.role.replace('_', ' ')}</span>}
             <Link href="/" className="text-slate-300 hover:text-white text-sm">
               View Site
             </Link>

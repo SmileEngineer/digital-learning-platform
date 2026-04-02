@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import { mapCatalogItem, type CatalogItemRow } from '../platform.js';
-import { requireAdminUser, requireSessionUser } from '../auth/session.js';
+import { requireAdminPermission, requireSessionUser } from '../auth/session.js';
 
 type EbookPageInput = {
   title: string;
@@ -299,7 +299,7 @@ export function createAdminEbooksRouter(sql: NeonQueryFunction<false, false>): R
 
   router.get('/ebooks', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'ebooks');
       if (!user) return;
       const items = await listEbooks(sql);
       res.json({ items: items.map(toAdminEbook) });
@@ -311,7 +311,7 @@ export function createAdminEbooksRouter(sql: NeonQueryFunction<false, false>): R
 
   router.get('/ebooks/:id', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'ebooks');
       if (!user) return;
       const item = await getEbookById(sql, req.params.id);
       if (!item) {
@@ -327,7 +327,7 @@ export function createAdminEbooksRouter(sql: NeonQueryFunction<false, false>): R
 
   router.post('/ebooks', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'ebooks');
       if (!user) return;
       const parsed = parseEbookInput((req.body ?? {}) as Record<string, unknown>);
       if (!parsed.data) {
@@ -397,7 +397,7 @@ export function createAdminEbooksRouter(sql: NeonQueryFunction<false, false>): R
 
   router.patch('/ebooks/:id', async (req, res) => {
     try {
-      const user = await requireAdminUser(req, res, sql);
+      const user = await requireAdminPermission(req, res, sql, 'ebooks');
       if (!user) return;
       const existing = await getEbookById(sql, req.params.id);
       if (!existing) {
