@@ -1,13 +1,34 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Calendar, ClipboardList, FileText, Package, Video, BookOpen } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Card } from '../../components/Card';
 import { Badge } from '../../components/Badge';
 import { fetchDashboardOverview, type DashboardOverview } from '@/lib/platform-api';
 
+function getContinueLearningHref(type: string, slug: string): string {
+  switch (type) {
+    case 'course':
+      return `/courses/${slug}?resume=1`;
+    case 'ebook':
+      return `/ebooks/${slug}`;
+    case 'live_class':
+      return `/live-classes/${slug}`;
+    case 'practice_exam':
+      return `/practice-exams/${slug}`;
+    case 'physical_book':
+      return `/books/${slug}`;
+    case 'article':
+      return `/articles/${slug}`;
+    default:
+      return '/dashboard';
+  }
+}
+
 export function DashboardOverviewPage() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,7 +94,12 @@ export function DashboardOverviewPage() {
           <div className="space-y-4">
             {data?.recentAccess.length ? (
               data.recentAccess.map((item) => (
-                <div key={`${item.type}-${item.slug}`} className="flex items-center gap-4 p-3 bg-slate-50 rounded-lg">
+                <button
+                  type="button"
+                  key={`${item.type}-${item.slug}`}
+                  className="flex w-full items-center gap-4 rounded-lg bg-slate-50 p-3 text-left transition hover:bg-slate-100"
+                  onClick={() => router.push(getContinueLearningHref(item.type, item.slug))}
+                >
                   <img src={item.image} alt={item.title} className="w-16 h-12 rounded object-cover" />
                   <div className="flex-1">
                     <h3 className="text-sm mb-1">{item.title}</h3>
@@ -84,7 +110,7 @@ export function DashboardOverviewPage() {
                       {item.progress}% complete • {item.expires}
                     </p>
                   </div>
-                </div>
+                </button>
               ))
             ) : (
               <p className="text-sm text-slate-600">No recent learner activity yet.</p>

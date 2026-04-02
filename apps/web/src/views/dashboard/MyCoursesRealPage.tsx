@@ -154,7 +154,7 @@ export function MyCoursesRealPage() {
                   </div>
 
                   <div className="flex gap-3">
-                    <Button onClick={() => router.push(`/courses/${course.slug}`)}>
+                    <Button onClick={() => router.push(`/courses/${course.slug}?resume=1`)}>
                       <PlayCircle className="w-4 h-4 mr-2" />
                       {course.progressPercent >= 100 ? 'Review Course' : 'Continue Learning'}
                     </Button>

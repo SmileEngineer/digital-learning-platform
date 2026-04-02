@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   Award,
   CheckCircle,
@@ -20,6 +20,7 @@ import { CourseCard } from '@/components/CourseCard';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   fetchCourseDetail,
+  saveCourseProgress,
   type CourseDetail,
   type CourseSummary,
 } from '@/lib/course-api';
@@ -38,14 +39,18 @@ function isEmbedUrl(url: string): boolean {
 export function CourseDetailsPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const slug = Array.isArray(params?.id) ? params.id[0] : params?.id;
+  const requestedLectureId = searchParams.get('lecture');
+  const resumeMode = searchParams.get('resume') === '1';
 
   const [course, setCourse] = useState<CourseDetail | null>(null);
   const [relatedCourses, setRelatedCourses] = useState<CourseSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedLectureId, setSelectedLectureId] = useState<string | null>(null);
+  const lastTrackedLectureId = useRef<string | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -92,8 +97,51 @@ export function CourseDetailsPage() {
   useEffect(() => {
     if (!course) return;
     const lectures = course.sections.flatMap((section) => section.lectures);
-    setSelectedLectureId(lectures[0]?.id ?? null);
-  }, [course]);
+    if (lectures.length === 0) {
+      setSelectedLectureId(null);
+      return;
+    }
+
+    const requestedLecture = requestedLectureId
+      ? lectures.find((lecture) => lecture.id === requestedLectureId)
+      : null;
+    const resumeLecture =
+      requestedLecture ??
+      (resumeMode && course.resumeLectureId
+        ? lectures.find((lecture) => lecture.id === course.resumeLectureId) ?? null
+        : null);
+
+    setSelectedLectureId(resumeLecture?.id ?? lectures[0]?.id ?? null);
+  }, [course, requestedLectureId, resumeMode]);
+
+  useEffect(() => {
+    if (!course?.hasAccess || !selectedLectureId || !slug) return;
+    if (lastTrackedLectureId.current === selectedLectureId) return;
+
+    lastTrackedLectureId.current = selectedLectureId;
+    saveCourseProgress(slug, selectedLectureId)
+      .then((progress) => {
+        setCourse((current) =>
+          current
+            ? {
+                ...current,
+                progressPercent: progress.progressPercent,
+                completedLectures: progress.completedLectures,
+                resumeLectureId: progress.resumeLectureId,
+              }
+            : current
+        );
+      })
+      .catch(() => {
+        lastTrackedLectureId.current = null;
+      });
+  }, [course?.hasAccess, selectedLectureId, slug]);
+
+  function selectLecture(lectureId: string) {
+    setSelectedLectureId(lectureId);
+    if (!slug) return;
+    router.replace(`/courses/${slug}?lecture=${encodeURIComponent(lectureId)}`, { scroll: false });
+  }
 
   function handleCheckoutRedirect() {
     if (!course) return;
@@ -185,6 +233,13 @@ export function CourseDetailsPage() {
                   </Badge>
                 )}
               </div>
+
+              {course.hasAccess && (
+                <div className="mb-4 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
+                  {course.progressPercent}% complete • {course.completedLectures} lecture
+                  {course.completedLectures === 1 ? '' : 's'} completed
+                </div>
+              )}
 
               {selectedLecture?.videoUrl ? (
                 <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-950">
@@ -291,7 +346,7 @@ export function CourseDetailsPage() {
                               className={`flex w-full items-center justify-between rounded-lg px-2 py-2 text-sm ${
                                 selectedLecture?.id === lecture.id ? 'bg-indigo-50' : 'hover:bg-white'
                               }`}
-                              onClick={() => setSelectedLectureId(lecture.id)}
+                              onClick={() => selectLecture(lecture.id)}
                             >
                               <div className="flex items-center gap-3">
                                 <PlayCircle className="w-4 h-4 text-slate-400" />
@@ -361,8 +416,20 @@ export function CourseDetailsPage() {
                 )}
 
                 {course.hasAccess ? (
-                  <Button fullWidth size="lg" className="mb-3" onClick={() => router.push('/dashboard/courses')}>
-                    Continue Learning
+                  <Button
+                    fullWidth
+                    size="lg"
+                    className="mb-3"
+                    onClick={() => {
+                      const resumeLectureId = course.resumeLectureId ?? selectedLecture?.id;
+                      if (resumeLectureId) {
+                        selectLecture(resumeLectureId);
+                        return;
+                      }
+                      router.push('/dashboard/courses');
+                    }}
+                  >
+                    Resume Course
                   </Button>
                 ) : (
                   <Button fullWidth size="lg" className="mb-3" onClick={handleCheckoutRedirect}>

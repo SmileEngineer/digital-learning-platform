@@ -141,7 +141,7 @@ export function createLearnerRouter(sql: NeonQueryFunction<false, false>): Route
           JOIN catalog_items c ON c.id = ue.item_id
           WHERE ue.user_id = ${user.id}
             AND ue.status = 'active'
-          ORDER BY ue.purchased_at DESC
+          ORDER BY COALESCE(ue.last_accessed_at, ue.purchased_at) DESC
           LIMIT 5
         `,
         sql`

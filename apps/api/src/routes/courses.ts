@@ -102,6 +102,7 @@ type CoursePurchaseRow = {
   access_expires_at: string | null;
   progress_percent: number;
   completed_lectures: number;
+  last_viewed_lecture_id: string | null;
 };
 
 type CourseSectionDto = {
@@ -412,7 +413,14 @@ async function getCoursePurchase(
   courseId: string
 ): Promise<CoursePurchaseRow | undefined> {
   const rows = await sql`
-    SELECT user_id, course_id, purchased_at, access_expires_at, progress_percent, completed_lectures
+    SELECT
+      user_id,
+      course_id,
+      purchased_at,
+      access_expires_at,
+      progress_percent,
+      completed_lectures,
+      last_viewed_lecture_id
     FROM course_purchases
     WHERE user_id = ${userId}
       AND course_id = ${courseId}
@@ -487,6 +495,64 @@ function accessExpiresAtForCourse(row: DbCourseRow): Date | null {
   return out;
 }
 
+function calculateProgressPercent(completedLectures: number, totalLectures: number): number {
+  if (totalLectures <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((completedLectures / totalLectures) * 100)));
+}
+
+async function upsertCourseEntitlement(
+  sql: NeonQueryFunction<false, false>,
+  input: {
+    userId: string;
+    courseSlug: string;
+    purchasedAt?: string | null;
+    accessExpiresAt?: string | null;
+    progressPercent?: number;
+    markAccessed?: boolean;
+  }
+) {
+  const entitlementRows = await sql`
+    SELECT id
+    FROM catalog_items
+    WHERE slug = ${input.courseSlug}
+      AND type = 'course'
+    LIMIT 1
+  `;
+  const entitlementItem = entitlementRows[0] as { id: string } | undefined;
+  if (!entitlementItem) return;
+
+  await sql`
+    INSERT INTO user_entitlements (
+      user_id,
+      item_id,
+      status,
+      purchased_at,
+      access_expires_at,
+      progress_percent,
+      last_accessed_at
+    )
+    VALUES (
+      ${input.userId},
+      ${entitlementItem.id},
+      'active',
+      COALESCE(${input.purchasedAt ?? null}::timestamptz, NOW()),
+      ${input.accessExpiresAt ?? null},
+      ${input.progressPercent ?? 0},
+      ${input.markAccessed ? new Date().toISOString() : null}
+    )
+    ON CONFLICT (user_id, item_id) DO UPDATE
+    SET
+      status = 'active',
+      purchased_at = COALESCE(user_entitlements.purchased_at, EXCLUDED.purchased_at),
+      access_expires_at = EXCLUDED.access_expires_at,
+      progress_percent = GREATEST(user_entitlements.progress_percent, EXCLUDED.progress_percent),
+      last_accessed_at = CASE
+        WHEN EXCLUDED.last_accessed_at IS NOT NULL THEN EXCLUDED.last_accessed_at
+        ELSE user_entitlements.last_accessed_at
+      END
+  `;
+}
+
 async function appendAccessInfo(
   sql: NeonQueryFunction<false, false>,
   row: DbCourseRow,
@@ -498,6 +564,9 @@ async function appendAccessInfo(
     hasAccess: isAdminRole(user?.role) || Boolean(purchase),
     isPurchased: Boolean(purchase),
     accessExpiresAt: purchase?.access_expires_at ?? null,
+    progressPercent: purchase?.progress_percent ?? 0,
+    completedLectures: purchase?.completed_lectures ?? 0,
+    resumeLectureId: purchase?.last_viewed_lecture_id ?? null,
   };
 }
 
@@ -746,9 +815,23 @@ export function createCoursesRouter(sql: NeonQueryFunction<false, false>): Route
             ${accessExpiresAt ? accessExpiresAt.toISOString() : null}
           )
         `;
+        await upsertCourseEntitlement(sql, {
+          userId: user.id,
+          courseSlug: row.slug,
+          accessExpiresAt: accessExpiresAt ? accessExpiresAt.toISOString() : null,
+        });
       }
 
       const purchase = await getCoursePurchase(sql, user.id, row.id);
+      if (purchase) {
+        await upsertCourseEntitlement(sql, {
+          userId: user.id,
+          courseSlug: row.slug,
+          purchasedAt: purchase.purchased_at,
+          accessExpiresAt: purchase.access_expires_at,
+          progressPercent: purchase.progress_percent,
+        });
+      }
       res.status(existing ? 200 : 201).json({
         message: existing ? 'Course already unlocked.' : 'Course access granted.',
         course: {
@@ -760,6 +843,92 @@ export function createCoursesRouter(sql: NeonQueryFunction<false, false>): Route
     } catch (error) {
       console.error('courses:purchase', error);
       res.status(500).json({ error: 'Could not unlock course access.' });
+    }
+  });
+
+  router.post('/:slug/progress', async (req, res) => {
+    try {
+      const user = await requireSessionUser(sql, req, res);
+      if (!user) return;
+
+      const lectureId =
+        typeof req.body?.lectureId === 'string' && req.body.lectureId.trim()
+          ? req.body.lectureId.trim()
+          : null;
+      if (!lectureId) {
+        res.status(400).json({ error: 'A lectureId is required.' });
+        return;
+      }
+
+      const row = await getCourseBySlug(sql, req.params.slug);
+      if (!row || row.status !== 'published') {
+        res.status(404).json({ error: 'Course not found.' });
+        return;
+      }
+
+      const purchase = await getCoursePurchase(sql, user.id, row.id);
+      if (!purchase) {
+        res.status(403).json({ error: 'Purchase this course to track progress.' });
+        return;
+      }
+
+      const lectureRows = await sql`
+        WITH ordered_lectures AS (
+          SELECT
+            l.id,
+            ROW_NUMBER() OVER (ORDER BY s.position ASC, l.position ASC)::int AS lecture_number,
+            COUNT(*) OVER ()::int AS total_lectures
+          FROM course_sections s
+          JOIN course_lectures l ON l.section_id = s.id
+          WHERE s.course_id = ${row.id}
+        )
+        SELECT id, lecture_number, total_lectures
+        FROM ordered_lectures
+        WHERE id = ${lectureId}
+        LIMIT 1
+      `;
+
+      const lecture = lectureRows[0] as
+        | { id: string; lecture_number: number; total_lectures: number }
+        | undefined;
+      if (!lecture) {
+        res.status(404).json({ error: 'Lecture not found for this course.' });
+        return;
+      }
+
+      const completedLectures = Math.max(purchase.completed_lectures, lecture.lecture_number - 1);
+      const progressPercent = Math.max(
+        purchase.progress_percent,
+        calculateProgressPercent(completedLectures, lecture.total_lectures)
+      );
+
+      await sql`
+        UPDATE course_purchases
+        SET
+          completed_lectures = ${completedLectures},
+          progress_percent = ${progressPercent},
+          last_viewed_lecture_id = ${lecture.id}
+        WHERE user_id = ${user.id}
+          AND course_id = ${row.id}
+      `;
+
+      await upsertCourseEntitlement(sql, {
+        userId: user.id,
+        courseSlug: row.slug,
+        purchasedAt: purchase.purchased_at,
+        accessExpiresAt: purchase.access_expires_at,
+        progressPercent,
+        markAccessed: true,
+      });
+
+      res.json({
+        progressPercent,
+        completedLectures,
+        resumeLectureId: lecture.id,
+      });
+    } catch (error) {
+      console.error('courses:progress', error);
+      res.status(500).json({ error: 'Could not save course progress.' });
     }
   });
 
@@ -781,6 +950,7 @@ export function createMeRouter(sql: NeonQueryFunction<false, false>): Router {
           cp.access_expires_at,
           cp.progress_percent,
           cp.completed_lectures,
+          cp.last_viewed_lecture_id,
           COALESCE(COUNT(all_cp.id), 0)::int AS students_count
         FROM course_purchases cp
         JOIN courses c ON c.id = cp.course_id
@@ -789,7 +959,13 @@ export function createMeRouter(sql: NeonQueryFunction<false, false>): Router {
          AND (all_cp.access_expires_at IS NULL OR all_cp.access_expires_at > NOW())
         WHERE cp.user_id = ${user.id}
           AND (cp.access_expires_at IS NULL OR cp.access_expires_at > NOW())
-        GROUP BY c.id, cp.purchased_at, cp.access_expires_at, cp.progress_percent, cp.completed_lectures
+        GROUP BY
+          c.id,
+          cp.purchased_at,
+          cp.access_expires_at,
+          cp.progress_percent,
+          cp.completed_lectures,
+          cp.last_viewed_lecture_id
         ORDER BY cp.purchased_at DESC
       `) as Array<
         DbCourseRow & {
@@ -797,6 +973,7 @@ export function createMeRouter(sql: NeonQueryFunction<false, false>): Router {
           access_expires_at: string | null;
           progress_percent: number;
           completed_lectures: number;
+          last_viewed_lecture_id: string | null;
         }
       >;
 
@@ -809,6 +986,7 @@ export function createMeRouter(sql: NeonQueryFunction<false, false>): Router {
           accessExpiresAt: row.access_expires_at,
           progressPercent: row.progress_percent,
           completedLectures: row.completed_lectures,
+          resumeLectureId: row.last_viewed_lecture_id,
         })),
       });
     } catch (error) {

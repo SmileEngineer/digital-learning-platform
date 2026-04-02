@@ -38,6 +38,9 @@ export type CourseDetail = CourseSummary & {
   hasAccess: boolean;
   isPurchased: boolean;
   accessExpiresAt: string | null;
+  progressPercent: number;
+  completedLectures: number;
+  resumeLectureId: string | null;
   sections: Array<{
     id: string;
     title: string;
@@ -68,6 +71,7 @@ export type PurchasedCourse = CourseSummary & {
   purchasedAt: string;
   progressPercent: number;
   completedLectures: number;
+  resumeLectureId?: string | null;
 };
 
 export type AdminCourseInput = {
@@ -148,6 +152,20 @@ export async function fetchMyCourses(): Promise<PurchasedCourse[]> {
   });
   if (!res.ok) throw new Error(await readAuthError(res));
   return (await parseJson<{ courses: PurchasedCourse[] }>(res)).courses;
+}
+
+export async function saveCourseProgress(
+  slug: string,
+  lectureId: string
+): Promise<{ progressPercent: number; completedLectures: number; resumeLectureId: string | null }> {
+  const res = await fetch(`/api/courses/${slug}/progress`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lectureId }),
+  });
+  if (!res.ok) throw new Error(await readAuthError(res));
+  return parseJson<{ progressPercent: number; completedLectures: number; resumeLectureId: string | null }>(res);
 }
 
 export async function fetchAdminCourses(): Promise<CourseSummary[]> {
