@@ -1,6 +1,6 @@
-import { SEMESTER_ROMAN, STATES, UNIVERSITIES_BY_STATE } from '@/lib/navCatalog';
+import { SEMESTER_ROMAN, getStates, getUniversities, labelForState, labelForUniversity, type CatalogBase } from '@/lib/navCatalog';
 
-export type BrowseBase = '/courses' | '/ebooks';
+export type BrowseBase = CatalogBase;
 
 export type BrowseSelection = {
   state: string;
@@ -12,6 +12,13 @@ export type BrowseMetadata = {
   stateName?: string | null;
   universityName?: string | null;
   semesterLabel?: string | null;
+};
+
+export type UniversityBrowseItem = {
+  stateId: string;
+  stateName: string;
+  universityId: string;
+  universityName: string;
 };
 
 export function createBrowseSelection(
@@ -37,9 +44,27 @@ export function buildBrowseHref(base: BrowseBase, selection: BrowseSelection): s
 
 export function getUniversityOptions(stateId: string) {
   if (!stateId) {
-    return Object.entries(UNIVERSITIES_BY_STATE).flatMap(([, items]) => items);
+    return getStates('/courses').flatMap((item) => getUniversities(item.id, '/courses'));
   }
-  return UNIVERSITIES_BY_STATE[stateId] ?? [];
+  return getUniversities(stateId, '/courses');
+}
+
+export function getUniversityOptionsForBase(stateId: string, base: BrowseBase) {
+  if (!stateId) {
+    return getStates(base).flatMap((item) => getUniversities(item.id, base));
+  }
+  return getUniversities(stateId, base);
+}
+
+export function getAllUniversities(base: BrowseBase = '/courses'): UniversityBrowseItem[] {
+  return getStates(base).flatMap((state) =>
+    getUniversities(state.id, base).map((university) => ({
+      stateId: state.id,
+      stateName: state.name,
+      universityId: university.id,
+      universityName: university.name,
+    }))
+  );
 }
 
 export function getSemesterOptions() {
@@ -49,12 +74,38 @@ export function getSemesterOptions() {
   }));
 }
 
-export function getStateOptionLabel(stateId: string): string {
-  return STATES.find((entry) => entry.id === stateId)?.name ?? stateId;
+export function getStateOptionLabel(stateId: string, base: BrowseBase = '/courses'): string {
+  return labelForState(stateId, base);
 }
 
-export function getUniversityOptionLabel(stateId: string, universityId: string): string {
-  return getUniversityOptions(stateId).find((entry) => entry.id === universityId)?.name ?? universityId;
+export function getUniversityOptionLabel(
+  stateId: string,
+  universityId: string,
+  base: BrowseBase = '/courses'
+): string {
+  return labelForUniversity(stateId, universityId, base);
+}
+
+export function findBrowseSelection(
+  base: BrowseBase,
+  stateName?: string | null,
+  universityName?: string | null
+): BrowseSelection | null {
+  const normalizedState = normalizeName(stateName);
+  const normalizedUniversity = normalizeName(universityName);
+  const match = getAllUniversities(base).find(
+    (entry) =>
+      (!normalizedState || normalizeName(entry.stateName) === normalizedState) &&
+      normalizeName(entry.universityName) === normalizedUniversity
+  );
+
+  if (!match) return null;
+
+  return {
+    state: match.stateId,
+    university: match.universityId,
+    semester: '',
+  };
 }
 
 export function normalizeSemesterLabel(label?: string | null): string {
@@ -71,14 +122,18 @@ function normalizeName(value?: string | null): string {
   return (value ?? '').trim().toLowerCase();
 }
 
-export function matchesBrowseSelection(item: BrowseMetadata, selection: BrowseSelection): boolean {
+export function matchesBrowseSelection(
+  item: BrowseMetadata,
+  selection: BrowseSelection,
+  base: BrowseBase = '/courses'
+): boolean {
   if (selection.state) {
-    const stateLabel = getStateOptionLabel(selection.state).toLowerCase();
+    const stateLabel = labelForState(selection.state, base).toLowerCase();
     if (normalizeName(item.stateName) !== stateLabel) return false;
   }
 
   if (selection.university) {
-    const universityLabel = getUniversityOptionLabel(selection.state, selection.university).toLowerCase();
+    const universityLabel = labelForUniversity(selection.state, selection.university, base).toLowerCase();
     if (normalizeName(item.universityName) !== universityLabel) return false;
   }
 

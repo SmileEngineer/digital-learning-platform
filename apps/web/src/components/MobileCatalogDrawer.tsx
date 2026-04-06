@@ -11,10 +11,11 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import {
-  STATES,
   SEMESTER_ROMAN,
   catalogBrowseUrl,
+  getStates,
   getUniversities,
+  supportsSemesters,
   type SemesterIndex,
 } from '@/lib/navCatalog';
 
@@ -25,16 +26,18 @@ function CatalogSection({
   title: string;
   base: '/courses' | '/ebooks';
 }) {
-  const [stateId, setStateId] = useState(STATES[0]?.id ?? 'telangana');
-  const universities = getUniversities(stateId);
+  const states = getStates(base);
+  const [stateId, setStateId] = useState(states[0]?.id ?? '');
+  const universities = getUniversities(stateId, base);
   const [universityId, setUniversityId] = useState(() => universities[0]?.id ?? '');
 
   useEffect(() => {
-    const next = getUniversities(stateId);
+    const next = getUniversities(stateId, base);
     setUniversityId(next[0]?.id ?? '');
-  }, [stateId]);
+  }, [base, stateId]);
 
   const uni = universityId || universities[0]?.id || '';
+  const showSemesters = uni ? supportsSemesters(stateId, uni, base) : false;
 
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
@@ -43,7 +46,7 @@ function CatalogSection({
       </p>
       <p className="mb-2 text-[0.7rem] font-medium text-slate-500">State</p>
       <div className="mb-3 flex flex-wrap gap-2">
-        {STATES.map((s) => (
+        {states.map((s) => (
           <Link
             key={s.id}
             href={`${base}?state=${encodeURIComponent(s.id)}`}
@@ -73,18 +76,26 @@ function CatalogSection({
           </Link>
         ))}
       </div>
-      <p className="mb-2 text-[0.7rem] font-medium text-slate-500">Semester I – VI</p>
-      <div className="grid grid-cols-3 gap-2">
-        {([1, 2, 3, 4, 5, 6] as const).map((sem) => (
-          <Link
-            key={sem}
-            href={uni ? catalogBrowseUrl(base, stateId, uni, sem as SemesterIndex) : base}
-            className="flex items-center justify-center rounded-lg border border-slate-200 bg-white py-2 text-sm font-semibold text-slate-800 hover:border-indigo-300 hover:bg-indigo-50"
-          >
-            {SEMESTER_ROMAN[sem - 1]}
-          </Link>
-        ))}
-      </div>
+      {showSemesters ? (
+        <>
+          <p className="mb-2 text-[0.7rem] font-medium text-slate-500">Semester I – VI</p>
+          <div className="grid grid-cols-3 gap-2">
+            {([1, 2, 3, 4, 5, 6] as const).map((sem) => (
+              <Link
+                key={sem}
+                href={uni ? catalogBrowseUrl(base, stateId, uni, sem as SemesterIndex) : base}
+                className="flex items-center justify-center rounded-lg border border-slate-200 bg-white py-2 text-sm font-semibold text-slate-800 hover:border-indigo-300 hover:bg-indigo-50"
+              >
+                {SEMESTER_ROMAN[sem - 1]}
+              </Link>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm text-slate-600">
+          This category does not use semesters. Choose a sub-category to continue.
+        </div>
+      )}
     </div>
   );
 }

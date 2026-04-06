@@ -6,12 +6,15 @@ import { RotateCcw, Search } from 'lucide-react';
 import { Button } from '@/components/Button';
 import { CatalogFilterBanner } from '@/components/CatalogFilterBanner';
 import { CourseCard } from '@/components/CourseCard';
+import { UniversityShowcase, type UniversityShowcaseSection } from '@/components/UniversityShowcase';
 import { fetchCourses, type CourseSummary } from '@/lib/course-api';
 import {
   buildBrowseHref,
   createBrowseSelection,
+  getUniversityOptionsForBase,
+  findBrowseSelection,
+  getAllUniversities,
   getSemesterOptions,
-  getUniversityOptions,
   matchesBrowseSelection,
 } from '@/lib/catalog-browse';
 
@@ -59,13 +62,16 @@ export function CoursesCatalogPage() {
     [searchParams]
   );
 
-  const universityOptions = useMemo(() => getUniversityOptions(selection.state), [selection.state]);
+  const universityOptions = useMemo(
+    () => getUniversityOptionsForBase(selection.state, '/courses'),
+    [selection.state]
+  );
   const semesterOptions = useMemo(() => getSemesterOptions(), []);
 
   const filteredCourses = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return courses.filter((course) => {
-      const matchesBrowse = matchesBrowseSelection(course, selection);
+      const matchesBrowse = matchesBrowseSelection(course, selection, '/courses');
       const matchesQuery =
         !query ||
         course.title.toLowerCase().includes(query) ||
@@ -77,6 +83,41 @@ export function CoursesCatalogPage() {
       return matchesBrowse && matchesQuery;
     });
   }, [courses, searchQuery, selection]);
+
+  const showUniversitySections =
+    !loading &&
+    !searchQuery.trim() &&
+    !selection.state &&
+    !selection.university &&
+    !selection.semester;
+
+  const universitySections = useMemo(() => {
+    const sortedCourses = [...courses].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    return getAllUniversities('/courses')
+      .map((university): UniversityShowcaseSection<CourseSummary> | null => {
+        const items = sortedCourses
+          .filter(
+            (course) =>
+              course.stateName?.toLowerCase() === university.stateName.toLowerCase() &&
+              course.universityName?.toLowerCase() === university.universityName.toLowerCase()
+          )
+          .slice(0, 4);
+
+        if (items.length === 0) return null;
+
+        const browseSelection = findBrowseSelection('/courses', university.stateName, university.universityName);
+        return {
+          id: `${university.stateId}-${university.universityId}`,
+          title: university.universityName,
+          href: browseSelection ? buildBrowseHref('/courses', browseSelection) : '/courses',
+          items,
+        };
+      })
+      .filter((section): section is UniversityShowcaseSection<CourseSummary> => section !== null);
+  }, [courses]);
 
   function updateSelection(next: Partial<typeof selection>) {
     router.push(
@@ -173,6 +214,26 @@ export function CoursesCatalogPage() {
           <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-slate-600">
             No courses matched your current search and filter settings.
           </div>
+        ) : showUniversitySections && universitySections.length > 0 ? (
+          <UniversityShowcase
+            sections={universitySections}
+            renderItem={(course) => (
+              <CourseCard
+                key={course.id}
+                id={course.slug}
+                title={course.title}
+                description={course.shortDescription}
+                image={course.imageUrl}
+                price={course.price}
+                duration={course.durationText}
+                tags={course.tag ? [course.tag] : []}
+                instructor={course.instructorName}
+                stateName={course.stateName}
+                universityName={course.universityName}
+                semesterLabel={course.semesterLabel}
+              />
+            )}
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredCourses.map((course) => (

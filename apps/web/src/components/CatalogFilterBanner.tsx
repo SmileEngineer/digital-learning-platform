@@ -1,6 +1,6 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import {
   labelForState,
   labelForUniversity,
@@ -8,10 +8,12 @@ import {
 } from '@/lib/navCatalog';
 
 export function CatalogFilterBanner() {
+  const pathname = usePathname();
   const sp = useSearchParams();
   const state = sp.get('state');
   const university = sp.get('university');
   const semester = sp.get('semester');
+  const base = pathname.startsWith('/ebooks') ? '/ebooks' : '/courses';
 
   if (!state && !university && !semester) return null;
 
@@ -25,10 +27,10 @@ export function CatalogFilterBanner() {
       role="status"
     >
       <span className="font-semibold text-indigo-900">Catalog: </span>
-      {state && <span>{labelForState(state)}</span>}
+      {state && <span>{labelForState(state, base)}</span>}
       {state && university && <span className="text-indigo-600"> · </span>}
       {university && state && (
-        <span>{labelForUniversity(state, university)}</span>
+        <span>{labelForUniversity(state, university, base)}</span>
       )}
       {(state || university) && semester && (
         <span className="text-indigo-600"> · </span>

@@ -5,12 +5,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChevronDown } from 'lucide-react';
 import {
-  STATES,
   SEMESTER_ROMAN,
+  getStates,
   labelForState,
   labelForUniversity,
   catalogBrowseUrl,
   getUniversities,
+  supportsSemesters,
   type SemesterIndex,
 } from '@/lib/navCatalog';
 
@@ -26,16 +27,18 @@ export function NavMegaMenuTrigger({
   base: Base;
   label: string;
 }) {
-  const [stateId, setStateId] = useState(STATES[0]?.id ?? 'telangana');
-  const universities = getUniversities(stateId);
+  const states = getStates(base);
+  const [stateId, setStateId] = useState(states[0]?.id ?? '');
+  const universities = getUniversities(stateId, base);
   const [universityId, setUniversityId] = useState(() => universities[0]?.id ?? '');
 
   useEffect(() => {
-    const next = getUniversities(stateId);
+    const next = getUniversities(stateId, base);
     setUniversityId(next[0]?.id ?? '');
-  }, [stateId]);
+  }, [base, stateId]);
 
   const activeUniversityId = universityId || universities[0]?.id || '';
+  const showSemesters = activeUniversityId ? supportsSemesters(stateId, activeUniversityId, base) : false;
   const pathname = usePathname();
   const sectionActive = pathname === base || pathname.startsWith(`${base}/`);
 
@@ -59,12 +62,12 @@ export function NavMegaMenuTrigger({
           <div className="mb-4 grid grid-cols-3 gap-2 border-b border-slate-100 pb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <span>State</span>
             <span>University</span>
-            <span>Semester</span>
+              <span>{showSemesters ? 'Semester' : 'Browse'}</span>
           </div>
 
           <div className="grid max-h-[min(70vh,22rem)] grid-cols-3 gap-4">
             <ul className="space-y-0.5 overflow-y-auto pr-1 text-sm">
-              {STATES.map((s) => (
+              {states.map((s) => (
                 <li key={s.id}>
                   <Link
                     href={`${base}?state=${encodeURIComponent(s.id)}`}
@@ -101,32 +104,43 @@ export function NavMegaMenuTrigger({
             </ul>
 
             <div className="border-l border-slate-100 pl-4">
-              <p className="mb-2 text-xs font-medium text-slate-500">Semester I – VI</p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {([1, 2, 3, 4, 5, 6] as const).map((sem) => (
-                  <Link
-                    key={sem}
-                    href={
-                      activeUniversityId
-                        ? catalogBrowseUrl(
-                            base,
-                            stateId,
-                            activeUniversityId,
-                            sem as SemesterIndex
-                          )
-                        : base
-                    }
-                    className="flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50/80 px-2 py-2.5 text-center text-sm font-semibold text-slate-800 transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-950"
-                  >
-                    {SEMESTER_ROMAN[sem - 1]}
-                  </Link>
-                ))}
-              </div>
+              {showSemesters ? (
+                <>
+                  <p className="mb-2 text-xs font-medium text-slate-500">Semester I – VI</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {([1, 2, 3, 4, 5, 6] as const).map((sem) => (
+                      <Link
+                        key={sem}
+                        href={
+                          activeUniversityId
+                            ? catalogBrowseUrl(
+                                base,
+                                stateId,
+                                activeUniversityId,
+                                sem as SemesterIndex
+                              )
+                            : base
+                        }
+                        className="flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50/80 px-2 py-2.5 text-center text-sm font-semibold text-slate-800 transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-950"
+                      >
+                        {SEMESTER_ROMAN[sem - 1]}
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-600">
+                  <p className="font-medium text-slate-900">No semester split</p>
+                  <p className="mt-2">
+                    This category stops at the sub-category level. Click the selected item to browse all matching {label.toLowerCase()}.
+                  </p>
+                </div>
+              )}
               <p className="mt-3 text-[0.7rem] leading-snug text-slate-500">
                 Browse {label.toLowerCase()} by state, university, and semester. You can also click{' '}
-                {labelForState(stateId)}
-                {activeUniversityId ? `, ${labelForUniversity(stateId, activeUniversityId)}` : ''}, or any semester
-                directly.
+                {labelForState(stateId, base)}
+                {activeUniversityId ? `, ${labelForUniversity(stateId, activeUniversityId, base)}` : ''}
+                {showSemesters ? ', or any semester directly.' : ' directly.'}
               </p>
             </div>
           </div>

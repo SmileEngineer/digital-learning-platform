@@ -1,7 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Award, BookOpen, BookText, FileText, Video } from 'lucide-react';
+import { CourseCard } from '@/components/CourseCard';
+import { UniversityShowcase, type UniversityShowcaseSection } from '@/components/UniversityShowcase';
+import { fetchCourses, type CourseSummary } from '@/lib/course-api';
+import { buildBrowseHref, findBrowseSelection, getAllUniversities } from '@/lib/catalog-browse';
 
 const categories = [
   {
@@ -47,6 +52,56 @@ const categories = [
 ] as const;
 
 export function HomePage() {
+  const [courses, setCourses] = useState<CourseSummary[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchCourses()
+      .then((items) => {
+        if (!cancelled) {
+          setCourses(items);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCourses([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const universitySections = useMemo(() => {
+    const sortedCourses = [...courses].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    return getAllUniversities('/courses')
+      .map((university): UniversityShowcaseSection<CourseSummary> | null => {
+        const items = sortedCourses
+          .filter(
+            (course) =>
+              course.stateName?.toLowerCase() === university.stateName.toLowerCase() &&
+              course.universityName?.toLowerCase() === university.universityName.toLowerCase()
+          )
+          .slice(0, 4);
+
+        if (items.length === 0) return null;
+
+        const selection = findBrowseSelection('/courses', university.stateName, university.universityName);
+        return {
+          id: `${university.stateId}-${university.universityId}`,
+          title: university.universityName,
+          href: selection ? buildBrowseHref('/courses', selection) : '/courses',
+          items,
+        };
+      })
+      .filter((section): section is UniversityShowcaseSection<CourseSummary> => section !== null);
+  }, [courses]);
+
   return (
     <div>
       <section className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 py-14 text-white">
@@ -93,6 +148,32 @@ export function HomePage() {
           </div>
         </div>
       </section>
+
+      {universitySections.length > 0 && (
+        <section className="bg-slate-50 py-16">
+          <div className="container mx-auto px-4">
+            <UniversityShowcase
+              sections={universitySections}
+              renderItem={(course) => (
+                <CourseCard
+                  key={course.id}
+                  id={course.slug}
+                  title={course.title}
+                  description={course.shortDescription}
+                  image={course.imageUrl}
+                  price={course.price}
+                  duration={course.durationText}
+                  tags={course.tag ? [course.tag] : []}
+                  instructor={course.instructorName}
+                  stateName={course.stateName}
+                  universityName={course.universityName}
+                  semesterLabel={course.semesterLabel}
+                />
+              )}
+            />
+          </div>
+        </section>
+      )}
     </div>
   );
 }

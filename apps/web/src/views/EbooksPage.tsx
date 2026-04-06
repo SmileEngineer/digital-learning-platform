@@ -6,12 +6,15 @@ import { EbookCard } from '../components/EbookCard';
 import { CatalogFilterBanner } from '../components/CatalogFilterBanner';
 import { RotateCcw, Search } from 'lucide-react';
 import { Button } from '../components/Button';
+import { UniversityShowcase, type UniversityShowcaseSection } from '@/components/UniversityShowcase';
 import { fetchCatalogItems, type CatalogItem } from '@/lib/platform-api';
 import {
   buildBrowseHref,
   createBrowseSelection,
+  getUniversityOptionsForBase,
+  findBrowseSelection,
+  getAllUniversities,
   getSemesterOptions,
-  getUniversityOptions,
   matchesBrowseSelection,
 } from '@/lib/catalog-browse';
 
@@ -57,7 +60,10 @@ export function EbooksPage() {
     [searchParams]
   );
 
-  const universityOptions = useMemo(() => getUniversityOptions(selection.state), [selection.state]);
+  const universityOptions = useMemo(
+    () => getUniversityOptionsForBase(selection.state, '/ebooks'),
+    [selection.state]
+  );
   const semesterOptions = useMemo(() => getSemesterOptions(), []);
 
   const filtered = useMemo(() => {
@@ -65,7 +71,7 @@ export function EbooksPage() {
     return ebooks
       .filter((ebook) => {
         const hasBrowseMetadata = Boolean(ebook.stateName || ebook.universityName || ebook.semesterLabel);
-        const matchesBrowse = hasBrowseMetadata ? matchesBrowseSelection(ebook, selection) : true;
+        const matchesBrowse = hasBrowseMetadata ? matchesBrowseSelection(ebook, selection, '/ebooks') : true;
         const category = ebook.category ?? '';
         const author = ebook.author ?? ebook.instructor;
         const browseText = [ebook.stateName, ebook.universityName, ebook.semesterLabel].filter(Boolean).join(' ');
@@ -80,6 +86,41 @@ export function EbooksPage() {
       })
       .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
   }, [ebooks, searchQuery, selection]);
+
+  const showUniversitySections =
+    !loading &&
+    !searchQuery.trim() &&
+    !selection.state &&
+    !selection.university &&
+    !selection.semester;
+
+  const universitySections = useMemo(() => {
+    const sortedEbooks = [...ebooks].sort(
+      (a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
+    );
+
+    return getAllUniversities('/ebooks')
+      .map((university): UniversityShowcaseSection<CatalogItem> | null => {
+        const items = sortedEbooks
+          .filter(
+            (ebook) =>
+              ebook.stateName?.toLowerCase() === university.stateName.toLowerCase() &&
+              ebook.universityName?.toLowerCase() === university.universityName.toLowerCase()
+          )
+          .slice(0, 4);
+
+        if (items.length === 0) return null;
+
+        const browseSelection = findBrowseSelection('/ebooks', university.stateName, university.universityName);
+        return {
+          id: `${university.stateId}-${university.universityId}`,
+          title: university.universityName,
+          href: browseSelection ? buildBrowseHref('/ebooks', browseSelection) : '/ebooks',
+          items,
+        };
+      })
+      .filter((section): section is UniversityShowcaseSection<CatalogItem> => section !== null);
+  }, [ebooks]);
 
   function updateSelection(next: Partial<typeof selection>) {
     router.push(
@@ -170,6 +211,28 @@ export function EbooksPage() {
           <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-slate-600">
             No ebooks matched your current search and filter settings.
           </div>
+        ) : showUniversitySections && universitySections.length > 0 ? (
+          <UniversityShowcase
+            sections={universitySections}
+            renderItem={(ebook) => (
+              <EbookCard
+                key={ebook.id}
+                id={ebook.slug}
+                title={ebook.title}
+                description={ebook.description}
+                coverImage={ebook.coverImage}
+                price={ebook.price}
+                pages={ebook.pages ?? 0}
+                format={ebook.format}
+                downloadAllowed={ebook.downloadAllowed}
+                previewAvailable={ebook.previewAvailable}
+                tags={ebook.tags}
+                stateName={ebook.stateName}
+                universityName={ebook.universityName}
+                semesterLabel={ebook.semesterLabel}
+              />
+            )}
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {filtered.map((ebook) => (
