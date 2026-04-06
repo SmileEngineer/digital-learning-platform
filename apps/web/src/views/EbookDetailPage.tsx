@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { AlertTriangle, Download, Eye, FileText, Shield, Smartphone, Star } from 'lucide-react';
+import { AlertTriangle, Download, Eye, FileText, Shield, Smartphone } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { Card } from '../components/Card';
@@ -15,6 +15,7 @@ import {
   type EbookReaderData,
 } from '@/lib/platform-api';
 import { buildQrCodeDataUrl, createWatermarkedEbookHtml, triggerHtmlDownload } from '@/lib/ebook-reader';
+import { formatRupees } from '@/lib/price';
 
 export function EbookDetailPage() {
   const params = useParams<{ id: string }>();
@@ -175,12 +176,6 @@ export function EbookDetailPage() {
               <p className="text-lg text-slate-600 mb-4">{item.description}</p>
 
               <div className="flex flex-wrap gap-4 text-sm text-slate-700">
-                {item.rating && (
-                  <div className="flex items-center gap-2">
-                    <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
-                    <span>{item.rating.toFixed(1)} rating</span>
-                  </div>
-                )}
                 <div className="flex items-center gap-2">
                   <FileText className="w-5 h-5" />
                   <span>{item.pages ?? 0} pages</span>
@@ -337,7 +332,7 @@ export function EbookDetailPage() {
           <div className="lg:col-span-1">
             <div className="sticky top-24">
               <Card>
-                <div className="text-3xl text-indigo-600 mb-4">${item.price.toFixed(2)}</div>
+                <div className="text-3xl text-indigo-600 mb-4">{formatRupees(item.price)}</div>
 
                 {hasAccess ? (
                   <>

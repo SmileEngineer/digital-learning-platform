@@ -60,7 +60,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               <GraduationCap className="h-6 w-6 text-indigo-200" />
             </div>
             <div>
-              <span className="block text-xl font-semibold tracking-tight">LearnHub Admin</span>
+              <span className="block text-xl font-semibold tracking-tight">Kantri Lawyer Admin</span>
               <span className="text-xs text-slate-400">Streamlined content and operations workspace</span>
             </div>
           </div>

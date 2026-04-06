@@ -33,12 +33,17 @@ export function Header() {
   const { user, logout } = useAuth();
   const accountHref =
     user?.role === 'staff' || user?.role === 'admin' || user?.role === 'super_admin' ? '/admin' : '/dashboard';
+  const notice = 'Site is under construction. No orders will be fulfilled at this time.';
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200/90 bg-white/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/90">
-      <div className="bg-gradient-to-r from-indigo-600 to-blue-600 py-2 text-center text-sm font-medium text-white">
-        New curriculum aligned with university semesters — browse by State, University & Semester I–VI
-        in the menu.
+      <div className="overflow-hidden border-b border-amber-200 bg-amber-100 text-amber-950">
+        <div className="kantri-marquee">
+          <div className="kantri-marquee-track py-2 text-sm font-medium">
+            <span>{notice}</span>
+            <span aria-hidden="true">{notice}</span>
+          </div>
+        </div>
       </div>
 
       <div className="container mx-auto px-4">
@@ -48,8 +53,8 @@ export function Header() {
             <Link href="/" className="flex min-w-0 items-center gap-3">
               <span className="relative flex h-12 w-12 shrink-0 overflow-hidden rounded-full border-[1.5px] border-indigo-600 bg-white shadow-[0_4px_14px_rgba(37,99,235,0.22)]">
                 <Image
-                  src="/images/logo.png"
-                  alt="LearnHub"
+                  src="/images/logo.svg"
+                  alt="Kantri Lawyer"
                   width={48}
                   height={48}
                   className="h-full w-full object-cover"
@@ -58,7 +63,7 @@ export function Header() {
               </span>
               <div className="hidden min-w-0 flex-col leading-tight sm:flex">
                 <span className="truncate text-[1.35rem] font-black tracking-tight text-slate-900 sm:text-[1.55rem]">
-                  LEARN<span className="text-indigo-600">HUB</span>
+                  KANTRI <span className="text-indigo-600">LAWYER</span>
                 </span>
               </div>
             </Link>
@@ -68,8 +73,10 @@ export function Header() {
             <NavLink href="/">Home</NavLink>
             <NavMegaMenuTrigger base="/courses" label="Courses" />
             <NavMegaMenuTrigger base="/ebooks" label="eBooks" />
-            <NavLink href="/books">Bookstore</NavLink>
+            <NavLink href="/books">Physical Books</NavLink>
             <NavLink href="/live-classes">Live Classes</NavLink>
+            <NavLink href="/practice-exams">Practice Exams</NavLink>
+            <NavLink href="/articles">Articles</NavLink>
             <NavLink href="/contact">Contact</NavLink>
           </nav>
 

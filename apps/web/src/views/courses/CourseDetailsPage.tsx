@@ -10,8 +10,6 @@ import {
   PlayCircle,
   Shield,
   Signal,
-  Star,
-  Users,
 } from 'lucide-react';
 import { Badge } from '@/components/Badge';
 import { Button } from '@/components/Button';
@@ -24,6 +22,7 @@ import {
   type CourseDetail,
   type CourseSummary,
 } from '@/lib/course-api';
+import { formatRupees } from '@/lib/price';
 
 function accessLabel(course: CourseDetail): string {
   if (course.accessType === 'fixed_months' && course.accessMonths) {
@@ -190,14 +189,6 @@ export function CourseDetailsPage() {
               <p className="text-lg text-slate-600 mb-4">{course.shortDescription}</p>
 
               <div className="flex flex-wrap gap-4 text-sm text-slate-700">
-                <div className="flex items-center gap-2">
-                  <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
-                  <span>{course.rating.toFixed(1)} rating</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  <span>{course.studentsCount} learners</span>
-                </div>
                 <div className="flex items-center gap-2">
                   <Clock className="w-5 h-5" />
                   <span>{course.durationText}</span>
@@ -408,7 +399,7 @@ export function CourseDetailsPage() {
           <div className="lg:col-span-1">
             <div className="sticky top-24">
               <Card>
-                <div className="text-3xl text-indigo-600 mb-4">${course.price.toFixed(2)}</div>
+                <div className="text-3xl text-indigo-600 mb-4">{formatRupees(course.price)}</div>
                 {error && (
                   <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                     {error}
@@ -494,10 +485,11 @@ export function CourseDetailsPage() {
                   image={related.imageUrl}
                   price={related.price}
                   duration={related.durationText}
-                  students={related.studentsCount}
-                  rating={related.rating}
                   tags={related.tag ? [related.tag] : []}
                   instructor={related.instructorName}
+                  stateName={related.stateName}
+                  universityName={related.universityName}
+                  semesterLabel={related.semesterLabel}
                 />
               ))}
             </div>

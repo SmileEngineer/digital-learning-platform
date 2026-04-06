@@ -18,6 +18,7 @@ import {
   type LearnerPracticeExamSession,
   type PracticeExamResult,
 } from '@/lib/platform-api';
+import { formatRupees } from '@/lib/price';
 
 export function PracticeExamDetailPage() {
   const params = useParams<{ id: string }>();
@@ -455,7 +456,7 @@ export function PracticeExamDetailPage() {
           <div className="lg:col-span-1">
             <div className="sticky top-24">
               <Card>
-                <div className="text-3xl text-indigo-600 mb-4">${item.price.toFixed(2)}</div>
+                <div className="text-3xl text-indigo-600 mb-4">{formatRupees(item.price)}</div>
 
                 <Button
                   fullWidth

@@ -7,6 +7,8 @@ import { ChevronDown } from 'lucide-react';
 import {
   STATES,
   SEMESTER_ROMAN,
+  labelForState,
+  labelForUniversity,
   catalogBrowseUrl,
   getUniversities,
   type SemesterIndex,
@@ -64,8 +66,8 @@ export function NavMegaMenuTrigger({
             <ul className="space-y-0.5 overflow-y-auto pr-1 text-sm">
               {STATES.map((s) => (
                 <li key={s.id}>
-                  <button
-                    type="button"
+                  <Link
+                    href={`${base}?state=${encodeURIComponent(s.id)}`}
                     onMouseEnter={() => setStateId(s.id)}
                     onFocus={() => setStateId(s.id)}
                     className={`w-full rounded-lg px-3 py-2 text-left transition-colors ${
@@ -75,7 +77,7 @@ export function NavMegaMenuTrigger({
                     }`}
                   >
                     {s.name}
-                  </button>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -83,8 +85,8 @@ export function NavMegaMenuTrigger({
             <ul className="space-y-0.5 overflow-y-auto border-l border-slate-100 pl-4 text-sm">
               {universities.map((u) => (
                 <li key={u.id}>
-                  <button
-                    type="button"
+                  <Link
+                    href={`${base}?state=${encodeURIComponent(stateId)}&university=${encodeURIComponent(u.id)}`}
                     onClick={() => setUniversityId(u.id)}
                     className={`w-full rounded-lg px-3 py-2 text-left transition-colors ${
                       activeUniversityId === u.id
@@ -93,7 +95,7 @@ export function NavMegaMenuTrigger({
                     }`}
                   >
                     {u.name}
-                  </button>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -121,7 +123,10 @@ export function NavMegaMenuTrigger({
                 ))}
               </div>
               <p className="mt-3 text-[0.7rem] leading-snug text-slate-500">
-                Browse {label.toLowerCase()} by state, university, and semester.
+                Browse {label.toLowerCase()} by state, university, and semester. You can also click{' '}
+                {labelForState(stateId)}
+                {activeUniversityId ? `, ${labelForUniversity(stateId, activeUniversityId)}` : ''}, or any semester
+                directly.
               </p>
             </div>
           </div>

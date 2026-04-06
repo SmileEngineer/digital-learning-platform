@@ -44,9 +44,9 @@ function CatalogSection({
       <p className="mb-2 text-[0.7rem] font-medium text-slate-500">State</p>
       <div className="mb-3 flex flex-wrap gap-2">
         {STATES.map((s) => (
-          <button
+          <Link
             key={s.id}
-            type="button"
+            href={`${base}?state=${encodeURIComponent(s.id)}`}
             onClick={() => setStateId(s.id)}
             className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
               stateId === s.id
@@ -55,22 +55,22 @@ function CatalogSection({
             }`}
           >
             {s.name}
-          </button>
+          </Link>
         ))}
       </div>
       <p className="mb-2 text-[0.7rem] font-medium text-slate-500">University</p>
       <div className="mb-3 flex flex-col gap-1">
         {universities.map((u) => (
-          <button
+          <Link
             key={u.id}
-            type="button"
+            href={`${base}?state=${encodeURIComponent(stateId)}&university=${encodeURIComponent(u.id)}`}
             onClick={() => setUniversityId(u.id)}
             className={`rounded-lg px-3 py-2 text-left text-sm transition-colors ${
               uni === u.id ? 'bg-indigo-50 font-semibold text-indigo-950' : 'text-slate-800'
             }`}
           >
             {u.name}
-          </button>
+          </Link>
         ))}
       </div>
       <p className="mb-2 text-[0.7rem] font-medium text-slate-500">Semester I – VI</p>
@@ -120,28 +120,42 @@ export function MobileCatalogDrawer() {
             className="rounded-lg px-3 py-2 text-slate-800 hover:bg-slate-100"
             onClick={() => setOpen(false)}
           >
-            All courses
+            Courses
           </Link>
           <Link
             href="/ebooks"
             className="rounded-lg px-3 py-2 text-slate-800 hover:bg-slate-100"
             onClick={() => setOpen(false)}
           >
-            All ebooks
+            eBooks
           </Link>
           <Link
             href="/books"
             className="rounded-lg px-3 py-2 text-slate-800 hover:bg-slate-100"
             onClick={() => setOpen(false)}
           >
-            Bookstore
+            Physical Books
           </Link>
           <Link
             href="/live-classes"
             className="rounded-lg px-3 py-2 text-slate-800 hover:bg-slate-100"
             onClick={() => setOpen(false)}
           >
-            Live classes
+            Live Classes
+          </Link>
+          <Link
+            href="/practice-exams"
+            className="rounded-lg px-3 py-2 text-slate-800 hover:bg-slate-100"
+            onClick={() => setOpen(false)}
+          >
+            Practice Exams
+          </Link>
+          <Link
+            href="/articles"
+            className="rounded-lg px-3 py-2 text-slate-800 hover:bg-slate-100"
+            onClick={() => setOpen(false)}
+          >
+            Articles
           </Link>
           <Link
             href="/contact"

@@ -40,7 +40,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         <div className="px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <GraduationCap className="w-8 h-8 text-indigo-600" />
-            <span className="text-xl">LearnHub</span>
+            <span className="text-xl">Kantri Lawyer</span>
           </Link>
 
           <div className="flex items-center gap-4">

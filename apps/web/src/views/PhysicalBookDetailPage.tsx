@@ -7,6 +7,7 @@ import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { Card } from '../components/Card';
 import { fetchCatalogItem, fetchDeliveryCheck, type CatalogItem, type DeliveryCheck } from '@/lib/platform-api';
+import { formatRupees } from '@/lib/price';
 
 export function PhysicalBookDetailPage() {
   const params = useParams<{ id: string }>();
@@ -113,7 +114,7 @@ export function PhysicalBookDetailPage() {
                 </div>
                 <div>
                   <div className="text-slate-600">Price</div>
-                  <div>${item.price.toFixed(2)}</div>
+                  <div>{formatRupees(item.price)}</div>
                 </div>
               </div>
             </Card>
@@ -169,7 +170,7 @@ export function PhysicalBookDetailPage() {
           <div className="lg:col-span-1">
             <div className="sticky top-24">
               <Card>
-                <div className="text-3xl text-indigo-600 mb-4">${item.price.toFixed(2)}</div>
+                <div className="text-3xl text-indigo-600 mb-4">{formatRupees(item.price)}</div>
 
                 <div className="mb-4">
                   <Badge variant={stock > 0 ? 'success' : 'error'}>

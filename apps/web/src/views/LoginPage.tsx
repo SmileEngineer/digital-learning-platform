@@ -46,7 +46,7 @@ export function LoginPage() {
           <Link href="/" className="mb-6 inline-flex items-center gap-2">
             <span className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full border border-indigo-600">
               <Image
-                src="/images/logo.png"
+                src="/images/logo.svg"
                 alt=""
                 width={40}
                 height={40}
@@ -54,7 +54,7 @@ export function LoginPage() {
               />
             </span>
             <span className="text-2xl font-black tracking-tight text-slate-900">
-              LEARN<span className="text-indigo-600">HUB</span>
+              KANTRI <span className="text-indigo-600">LAWYER</span>
             </span>
           </Link>
           <h1 className="mb-2 text-3xl font-semibold text-slate-900">Welcome back</h1>

@@ -1,3 +1,25 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+
+.kantri-marquee {
+  overflow: hidden;
+}
+
+.kantri-marquee-track {
+  display: flex;
+  width: max-content;
+  gap: 3rem;
+  white-space: nowrap;
+  animation: kantri-marquee 20s linear infinite;
+}
+
+@keyframes kantri-marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}

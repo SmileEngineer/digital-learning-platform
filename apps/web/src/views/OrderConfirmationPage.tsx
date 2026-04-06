@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
-import { CheckCircle, Download, FileText } from 'lucide-react';
+import { CheckCircle, Download } from 'lucide-react';
+import { formatRupees } from '@/lib/price';
 
 export function OrderConfirmationPage() {
   return (
@@ -26,14 +27,14 @@ export function OrderConfirmationPage() {
                 <p className="text-sm text-slate-600">Course</p>
               </div>
               <div className="text-right">
-                <div className="text-lg">$71.99</div>
+                <div className="text-lg">{formatRupees(71.99)}</div>
                 <div className="text-sm text-slate-600">20% off applied</div>
               </div>
             </div>
             
             <div className="flex justify-between">
               <span>Total Paid</span>
-              <span className="text-xl text-indigo-600">$71.99</span>
+              <span className="text-xl text-indigo-600">{formatRupees(71.99)}</span>
             </div>
           </div>
         </Card>

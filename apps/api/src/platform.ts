@@ -53,7 +53,11 @@ export type CatalogCardDto = {
   productId: string;
   slug: string;
   type: CatalogItemType;
+  createdAt?: string;
   category?: string;
+  stateName?: string;
+  universityName?: string;
+  semesterLabel?: string;
   title: string;
   description: string;
   image: string;
@@ -119,7 +123,11 @@ export function mapCatalogItem(row: CatalogItemRow): CatalogCardDto {
     productId: row.id,
     slug: row.slug,
     type: row.type,
+    createdAt: row.created_at,
     category: row.category ?? undefined,
+    stateName: typeof metadata.stateName === 'string' ? metadata.stateName : undefined,
+    universityName: typeof metadata.universityName === 'string' ? metadata.universityName : undefined,
+    semesterLabel: typeof metadata.semesterLabel === 'string' ? metadata.semesterLabel : undefined,
     title: row.title,
     description: row.description,
     image: row.image_url,
@@ -131,7 +139,7 @@ export function mapCatalogItem(row: CatalogItemRow): CatalogCardDto {
     students: row.students_count,
     rating: row.rating === null ? undefined : asMoney(row.rating),
     tags: row.tags ?? [],
-    instructor: row.instructor_name ?? row.author_name ?? 'LearnHub Team',
+    instructor: row.instructor_name ?? row.author_name ?? 'Kantri Lawyer Team',
     pages: row.pages ?? undefined,
     format: row.file_format ?? undefined,
     downloadAllowed: row.download_enabled,
@@ -183,7 +191,7 @@ export async function listCatalogItems(
         OR description ILIKE ${search}
         OR COALESCE(category, '') ILIKE ${search}
       )
-    ORDER BY featured DESC, created_at DESC
+    ORDER BY created_at DESC
     LIMIT ${limit}
   `) as CatalogItemRow[];
 

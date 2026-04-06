@@ -11,7 +11,11 @@ export type CatalogItem = {
   productId: string;
   slug: string;
   type: CatalogItemType;
+  createdAt?: string;
   category?: string;
+  stateName?: string;
+  universityName?: string;
+  semesterLabel?: string;
   title: string;
   description: string;
   image: string;

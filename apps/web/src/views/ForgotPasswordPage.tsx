@@ -1,6 +1,7 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '../components/Button';
-import { GraduationCap, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 export function ForgotPasswordPage() {
   return (
@@ -8,8 +9,12 @@ export function ForgotPasswordPage() {
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <GraduationCap className="w-10 h-10 text-indigo-600" />
-            <span className="text-2xl">LearnHub</span>
+            <span className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full border border-indigo-600">
+              <Image src="/images/logo.svg" alt="" width={40} height={40} className="object-cover" />
+            </span>
+            <span className="text-2xl font-black tracking-tight text-slate-900">
+              KANTRI <span className="text-indigo-600">LAWYER</span>
+            </span>
           </Link>
           <h1 className="text-3xl mb-2">Reset Password</h1>
           <p className="text-slate-600">Enter your email to receive a reset link</p>

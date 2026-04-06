@@ -656,6 +656,9 @@ async function syncCourseCatalogItem(
     accessMonths: row.access_months,
     finalQuizTitle: row.final_quiz_title,
     finalQuizQuestionCount: row.final_quiz_question_count,
+    stateName: row.state_name,
+    universityName: row.university_name,
+    semesterLabel: row.semester_label,
   };
 
   await sql`

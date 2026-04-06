@@ -1,21 +1,27 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Search, SlidersHorizontal } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { RotateCcw, Search } from 'lucide-react';
 import { Button } from '@/components/Button';
 import { CatalogFilterBanner } from '@/components/CatalogFilterBanner';
 import { CourseCard } from '@/components/CourseCard';
 import { fetchCourses, type CourseSummary } from '@/lib/course-api';
-
-type SortKey = 'popular' | 'newest' | 'price-asc' | 'price-desc' | 'rating';
+import {
+  buildBrowseHref,
+  createBrowseSelection,
+  getSemesterOptions,
+  getUniversityOptions,
+  matchesBrowseSelection,
+} from '@/lib/catalog-browse';
 
 export function CoursesCatalogPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [courses, setCourses] = useState<CourseSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<SortKey>('popular');
 
   useEffect(() => {
     let cancelled = false;
@@ -43,40 +49,43 @@ export function CoursesCatalogPage() {
     };
   }, []);
 
-  const categories = useMemo(
-    () => ['All', ...Array.from(new Set(courses.map((course) => course.category)))],
-    [courses]
+  const selection = useMemo(
+    () =>
+      createBrowseSelection(
+        searchParams.get('state'),
+        searchParams.get('university'),
+        searchParams.get('semester')
+      ),
+    [searchParams]
   );
+
+  const universityOptions = useMemo(() => getUniversityOptions(selection.state), [selection.state]);
+  const semesterOptions = useMemo(() => getSemesterOptions(), []);
 
   const filteredCourses = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    const filtered = courses.filter((course) => {
-      const matchesCategory =
-        selectedCategory === 'All' || course.category.toLowerCase() === selectedCategory.toLowerCase();
+    return courses.filter((course) => {
+      const matchesBrowse = matchesBrowseSelection(course, selection);
       const matchesQuery =
         !query ||
         course.title.toLowerCase().includes(query) ||
         course.shortDescription.toLowerCase().includes(query) ||
-        course.instructorName.toLowerCase().includes(query);
-      return matchesCategory && matchesQuery;
+        course.instructorName.toLowerCase().includes(query) ||
+        (course.stateName ?? '').toLowerCase().includes(query) ||
+        (course.universityName ?? '').toLowerCase().includes(query) ||
+        (course.semesterLabel ?? '').toLowerCase().includes(query);
+      return matchesBrowse && matchesQuery;
     });
+  }, [courses, searchQuery, selection]);
 
-    return filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'newest':
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        case 'price-asc':
-          return a.price - b.price;
-        case 'price-desc':
-          return b.price - a.price;
-        case 'rating':
-          return b.rating - a.rating;
-        case 'popular':
-        default:
-          return b.studentsCount - a.studentsCount;
-      }
-    });
-  }, [courses, searchQuery, selectedCategory, sortBy]);
+  function updateSelection(next: Partial<typeof selection>) {
+    router.push(
+      buildBrowseHref('/courses', {
+        ...selection,
+        ...next,
+      })
+    );
+  }
 
   return (
     <div className="py-8">
@@ -86,13 +95,13 @@ export function CoursesCatalogPage() {
         <div className="mb-8">
           <h1 className="text-4xl mb-3">All Courses</h1>
           <p className="text-slate-600 text-lg">
-            Browse expert-led digital courses with preview lessons and controlled access.
+            Browse law-focused digital courses by state, university, and semester.
           </p>
         </div>
 
         <div className="bg-white p-6 rounded-lg border border-slate-200 mb-8">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+            <div>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
@@ -104,39 +113,43 @@ export function CoursesCatalogPage() {
                 />
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Button variant="outline" type="button">
-                <SlidersHorizontal className="w-4 h-4 mr-2" />
-                Filters
-              </Button>
+            <div>
               <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortKey)}
-                className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                value={selection.university}
+                onChange={(e) => updateSelection({ university: e.target.value, semester: '' })}
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-indigo-500 focus:outline-none"
               >
-                <option value="popular">Most Popular</option>
-                <option value="newest">Newest</option>
-                <option value="price-asc">Price: Low to High</option>
-                <option value="price-desc">Price: High to Low</option>
-                <option value="rating">Highest Rated</option>
+                <option value="">All Universities</option>
+                {universityOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
               </select>
             </div>
-          </div>
-
-          <div className="flex gap-2 mt-4 flex-wrap">
-            {categories.map((category) => (
-              <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
-                className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-                  selectedCategory === category
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
+            <div>
+              <select
+                value={selection.semester}
+                onChange={(e) => updateSelection({ semester: e.target.value })}
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-indigo-500 focus:outline-none"
               >
-                {category}
-              </button>
-            ))}
+                <option value="">All Semesters</option>
+                {semesterOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => router.push('/courses')}
+              className="whitespace-nowrap"
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Reset
+            </Button>
           </div>
         </div>
 
@@ -171,10 +184,11 @@ export function CoursesCatalogPage() {
                 image={course.imageUrl}
                 price={course.price}
                 duration={course.durationText}
-                students={course.studentsCount}
-                rating={course.rating}
                 tags={course.tag ? [course.tag] : []}
                 instructor={course.instructorName}
+                stateName={course.stateName}
+                universityName={course.universityName}
+                semesterLabel={course.semesterLabel}
               />
             ))}
           </div>

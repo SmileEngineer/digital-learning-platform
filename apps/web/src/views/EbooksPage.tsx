@@ -1,19 +1,27 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { EbookCard } from '../components/EbookCard';
 import { CatalogFilterBanner } from '../components/CatalogFilterBanner';
-import { Search, SlidersHorizontal } from 'lucide-react';
+import { RotateCcw, Search } from 'lucide-react';
 import { Button } from '../components/Button';
 import { fetchCatalogItems, type CatalogItem } from '@/lib/platform-api';
+import {
+  buildBrowseHref,
+  createBrowseSelection,
+  getSemesterOptions,
+  getUniversityOptions,
+  matchesBrowseSelection,
+} from '@/lib/catalog-browse';
 
 export function EbooksPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [ebooks, setEbooks] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('popular');
 
   useEffect(() => {
     let cancelled = false;
@@ -39,52 +47,61 @@ export function EbooksPage() {
     };
   }, []);
 
-  const categories = useMemo(
-    () => ['All', ...Array.from(new Set(ebooks.map((ebook) => ebook.category).filter(Boolean) as string[]))],
-    [ebooks]
+  const selection = useMemo(
+    () =>
+      createBrowseSelection(
+        searchParams.get('state'),
+        searchParams.get('university'),
+        searchParams.get('semester')
+      ),
+    [searchParams]
   );
+
+  const universityOptions = useMemo(() => getUniversityOptions(selection.state), [selection.state]);
+  const semesterOptions = useMemo(() => getSemesterOptions(), []);
 
   const filtered = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    const results = ebooks.filter((ebook) => {
-      const category = ebook.category ?? '';
-      const matchesCategory =
-        selectedCategory === 'All' || category.toLowerCase() === selectedCategory.toLowerCase();
-      const matchesQuery =
-        !query ||
-        ebook.title.toLowerCase().includes(query) ||
-        ebook.description.toLowerCase().includes(query) ||
-        ebook.instructor.toLowerCase().includes(query);
-      return matchesCategory && matchesQuery;
-    });
+    return ebooks
+      .filter((ebook) => {
+        const hasBrowseMetadata = Boolean(ebook.stateName || ebook.universityName || ebook.semesterLabel);
+        const matchesBrowse = hasBrowseMetadata ? matchesBrowseSelection(ebook, selection) : true;
+        const category = ebook.category ?? '';
+        const author = ebook.author ?? ebook.instructor;
+        const browseText = [ebook.stateName, ebook.universityName, ebook.semesterLabel].filter(Boolean).join(' ');
+        const matchesQuery =
+          !query ||
+          ebook.title.toLowerCase().includes(query) ||
+          ebook.description.toLowerCase().includes(query) ||
+          author.toLowerCase().includes(query) ||
+          category.toLowerCase().includes(query) ||
+          browseText.toLowerCase().includes(query);
+        return matchesBrowse && matchesQuery;
+      })
+      .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
+  }, [ebooks, searchQuery, selection]);
 
-    return results.sort((a, b) => {
-      switch (sortBy) {
-        case 'newest':
-          return b.title.localeCompare(a.title);
-        case 'price-asc':
-          return a.price - b.price;
-        case 'price-desc':
-          return b.price - a.price;
-        case 'popular':
-        default:
-          return b.students - a.students;
-      }
-    });
-  }, [ebooks, searchQuery, selectedCategory, sortBy]);
+  function updateSelection(next: Partial<typeof selection>) {
+    router.push(
+      buildBrowseHref('/ebooks', {
+        ...selection,
+        ...next,
+      })
+    );
+  }
 
   return (
     <div className="py-8">
       <div className="container mx-auto px-4">
         <CatalogFilterBanner />
         <div className="mb-8">
-          <h1 className="text-4xl mb-3">eBooks & PDFs</h1>
-          <p className="text-slate-600 text-lg">Read online, unlock downloads, and preview pages before purchase.</p>
+          <h1 className="text-4xl mb-3">eBooks</h1>
+          <p className="text-slate-600 text-lg">Browse digital reading materials by state, university, and semester.</p>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg border border-slate-200 mb-8">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+            <div>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
@@ -96,39 +113,46 @@ export function EbooksPage() {
                 />
               </div>
             </div>
-            <Button variant="outline">
-              <SlidersHorizontal className="w-4 h-4 mr-2" />
-              Filters
-            </Button>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
-            >
-              <option value="popular">Most Popular</option>
-              <option value="newest">Newest</option>
-              <option value="price-asc">Price: Low to High</option>
-              <option value="price-desc">Price: High to Low</option>
-            </select>
-          </div>
-          
-          <div className="flex gap-2 mt-4 flex-wrap">
-            {categories.map((category) => (
-              <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
-                className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-                  selectedCategory === category
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
+            <div>
+              <select
+                value={selection.university}
+                onChange={(e) => updateSelection({ university: e.target.value, semester: '' })}
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-indigo-500 focus:outline-none"
               >
-                {category}
-              </button>
-            ))}
+                <option value="">All Universities</option>
+                {universityOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <select
+                value={selection.semester}
+                onChange={(e) => updateSelection({ semester: e.target.value })}
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+              >
+                <option value="">All Semesters</option>
+                {semesterOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => router.push('/ebooks')}
+              className="whitespace-nowrap"
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Reset
+            </Button>
           </div>
         </div>
-        
+
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <p className="text-slate-600">{loading ? 'Loading ebooks…' : `${filtered.length} ebooks found`}</p>
@@ -144,7 +168,7 @@ export function EbooksPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-slate-600">
-            No ebooks matched your current filters.
+            No ebooks matched your current search and filter settings.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -161,6 +185,9 @@ export function EbooksPage() {
                 downloadAllowed={ebook.downloadAllowed}
                 previewAvailable={ebook.previewAvailable}
                 tags={ebook.tags}
+                stateName={ebook.stateName}
+                universityName={ebook.universityName}
+                semesterLabel={ebook.semesterLabel}
               />
             ))}
           </div>

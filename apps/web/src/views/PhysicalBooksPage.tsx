@@ -6,6 +6,7 @@ import { Search, SlidersHorizontal } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { fetchCatalogItems, type CatalogItem } from '@/lib/platform-api';
+import { formatRupees } from '@/lib/price';
 
 export function PhysicalBooksPage() {
   const [books, setBooks] = useState<CatalogItem[]>([]);
@@ -43,7 +44,7 @@ export function PhysicalBooksPage() {
     <div className="py-8">
       <div className="container mx-auto px-4">
         <div className="mb-8">
-          <h1 className="text-4xl mb-3">Physical Bookstore</h1>
+          <h1 className="text-4xl mb-3">Physical Books</h1>
           <p className="text-slate-600 text-lg">Browse our collection of physical books with delivery validation.</p>
         </div>
 
@@ -95,7 +96,7 @@ export function PhysicalBooksPage() {
                     <p className="text-sm text-slate-600 mb-3">by {book.author ?? book.instructor}</p>
 
                     <div className="flex items-center justify-between">
-                      <span className="text-2xl text-indigo-600">${book.price.toFixed(2)}</span>
+                      <span className="text-2xl text-indigo-600">{formatRupees(book.price)}</span>
                       <Button size="sm" disabled={stock === 0}>
                         {stock === 0 ? 'Sold Out' : 'Buy Now'}
                       </Button>

@@ -4,8 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
-import { Badge } from '../components/Badge';
-import { Tag, CreditCard } from 'lucide-react';
+import { CreditCard } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   fetchCatalogItem,
@@ -14,13 +13,13 @@ import {
   type CatalogItem,
   type CheckoutQuote,
 } from '@/lib/platform-api';
+import { formatRupees } from '@/lib/price';
 
 export function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const productSlug = searchParams.get('product') ?? '';
-  const [couponCode, setCouponCode] = useState('');
   const [product, setProduct] = useState<CatalogItem | null>(null);
   const [quote, setQuote] = useState<CheckoutQuote | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,7 +92,6 @@ export function CheckoutPage() {
   const purchasePayload = useMemo(
     () => ({
       product: productSlug,
-      couponCode: couponCode.trim() || undefined,
       shipping: requiresShipping
         ? {
             ...shipping,
@@ -102,7 +100,7 @@ export function CheckoutPage() {
           }
         : undefined,
     }),
-    [billingEmail, billingName, couponCode, productSlug, requiresShipping, shipping]
+    [billingEmail, billingName, productSlug, requiresShipping, shipping]
   );
 
   async function refreshQuote() {
@@ -110,10 +108,10 @@ export function CheckoutPage() {
     try {
       const next = await fetchCheckoutQuote(purchasePayload);
       setQuote(next);
-      setMessage(next.coupon?.applied ? `Coupon ${next.coupon.code} applied.` : 'Quote updated.');
+      setMessage('Quote updated.');
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not apply coupon.');
+      setError(err instanceof Error ? err.message : 'Could not refresh quote.');
     }
   }
 
@@ -281,30 +279,6 @@ export function CheckoutPage() {
               {message && <p className="mb-3 text-sm text-green-700">{message}</p>}
               {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
-              <div className="mb-4">
-                <label className="block text-sm mb-2">Coupon Code</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value)}
-                    placeholder="Enter code"
-                    className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-indigo-500 text-sm"
-                  />
-                  <Button size="sm" onClick={() => void refreshQuote()} disabled={!productSlug || loading}>
-                    Apply
-                  </Button>
-                </div>
-                {quote?.coupon?.applied && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <Badge variant="success" size="sm">
-                      <Tag className="w-3 h-3 mr-1" />
-                      {quote.coupon.code} applied
-                    </Badge>
-                  </div>
-                )}
-              </div>
-
               {requiresShipping && (
                 <Button
                   fullWidth
@@ -320,19 +294,19 @@ export function CheckoutPage() {
               <div className="space-y-2 mb-4 pb-4 border-b border-slate-200">
                 <div className="flex justify-between text-sm">
                   <span>Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
+                  <span>{formatRupees(subtotal)}</span>
                 </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
                     <span>Discount</span>
-                    <span>-${discount.toFixed(2)}</span>
+                    <span>-{formatRupees(discount)}</span>
                   </div>
                 )}
               </div>
 
               <div className="flex justify-between text-lg mb-6">
                 <span>Total</span>
-                <span className="text-indigo-600">${total.toFixed(2)}</span>
+                <span className="text-indigo-600">{formatRupees(total)}</span>
               </div>
 
               <Button

@@ -6,6 +6,7 @@ import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { CheckCircle, ExternalLink, Truck } from 'lucide-react';
 import { fetchLearnerOrders, type LearnerOrder } from '@/lib/platform-api';
+import { formatRupees } from '@/lib/price';
 
 export function MyOrdersPage() {
   const [orders, setOrders] = useState<LearnerOrder[]>([]);
@@ -53,7 +54,7 @@ export function MyOrdersPage() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm text-slate-600 mb-1">{order.itemTitle}</div>
-                <div className="text-lg">${order.totalAmount.toFixed(2)}</div>
+                <div className="text-lg">{formatRupees(order.totalAmount)}</div>
                 {order.consignmentNumber && (
                   <div className="text-xs text-slate-500 mt-1">
                     Tracking: {order.consignmentNumber} {order.carrier ? `(${order.carrier})` : ''}

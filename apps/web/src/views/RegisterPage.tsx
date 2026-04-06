@@ -56,7 +56,7 @@ export function RegisterPage() {
           <Link href="/" className="mb-6 inline-flex items-center gap-2">
             <span className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full border border-indigo-600">
               <Image
-                src="/images/logo.png"
+                src="/images/logo.svg"
                 alt=""
                 width={40}
                 height={40}
@@ -64,7 +64,7 @@ export function RegisterPage() {
               />
             </span>
             <span className="text-2xl font-black tracking-tight text-slate-900">
-              LEARN<span className="text-indigo-600">HUB</span>
+              KANTRI <span className="text-indigo-600">LAWYER</span>
             </span>
           </Link>
           <h1 className="mb-2 text-3xl font-semibold text-slate-900">Create account</h1>
@@ -153,7 +153,16 @@ export function RegisterPage() {
                 checked={agreed}
                 onChange={(e) => setAgreed(e.target.checked)}
               />
-              <span>I agree to the Terms of Service and Privacy Policy</span>
+              <span>
+                I agree to the{' '}
+                <Link href="/terms-of-service" className="font-medium text-indigo-600 hover:text-indigo-700">
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link href="/privacy-policy" className="font-medium text-indigo-600 hover:text-indigo-700">
+                  Privacy Policy
+                </Link>
+              </span>
             </label>
 
             <Button type="submit" fullWidth size="lg" disabled={submitting}>
