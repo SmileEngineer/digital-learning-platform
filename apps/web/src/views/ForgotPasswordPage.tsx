@@ -10,7 +10,7 @@ export function ForgotPasswordPage() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 mb-6">
             <span className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full border border-indigo-600">
-              <Image src="/images/logo.svg" alt="" width={40} height={40} className="object-cover" />
+              <Image src="/images/logo.png" alt="" width={40} height={40} className="object-cover" />
             </span>
             <span className="text-2xl font-black tracking-tight text-slate-900">
               KANTRI <span className="text-indigo-600">LAWYER</span>

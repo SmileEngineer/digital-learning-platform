@@ -46,7 +46,7 @@ export function LoginPage() {
           <Link href="/" className="mb-6 inline-flex items-center gap-2">
             <span className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full border border-indigo-600">
               <Image
-                src="/images/logo.svg"
+                src="/images/logo.png"
                 alt=""
                 width={40}
                 height={40}

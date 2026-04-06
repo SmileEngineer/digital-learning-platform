@@ -53,7 +53,7 @@ export function Header() {
             <Link href="/" className="flex min-w-0 items-center gap-3">
               <span className="relative flex h-12 w-12 shrink-0 overflow-hidden rounded-full border-[1.5px] border-indigo-600 bg-white shadow-[0_4px_14px_rgba(37,99,235,0.22)]">
                 <Image
-                  src="/images/logo.svg"
+                  src="/images/logo.png"
                   alt="Kantri Lawyer"
                   width={48}
                   height={48}

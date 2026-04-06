@@ -5,6 +5,11 @@ import { Providers } from './providers';
 export const metadata: Metadata = {
   title: 'Kantri Lawyer',
   description: 'Courses, eBooks, physical books, live classes, and practice exams',
+  icons: {
+    icon: '/images/logo.png',
+    shortcut: '/images/logo.png',
+    apple: '/images/logo.png',
+  },
 };
 
 export default function RootLayout({
