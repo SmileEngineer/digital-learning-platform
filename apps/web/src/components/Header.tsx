@@ -90,14 +90,6 @@ export function Header() {
                 >
                   {user.name.split(/\s+/)[0]}
                 </Link>
-                {(user.role === 'staff' || user.role === 'admin' || user.role === 'super_admin') && (
-                  <Link
-                    href="/admin"
-                    className="hidden rounded-lg px-2 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 sm:inline-block"
-                  >
-                    Admin
-                  </Link>
-                )}
               </>
             )}
             <Link

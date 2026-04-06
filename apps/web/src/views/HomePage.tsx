@@ -129,16 +129,18 @@ export function HomePage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid grid-cols-1 gap-6 md:auto-rows-fr md:grid-cols-2 xl:grid-cols-5">
             {categories.map((category) => {
               const Icon = category.icon;
               return (
-                <Link key={category.href} href={category.href} className="group">
-                  <div className={`rounded-2xl bg-gradient-to-br ${category.className} p-8 text-white transition-shadow hover:shadow-lg`}>
+                <Link key={category.href} href={category.href} className="group block h-full">
+                  <div
+                    className={`flex h-full flex-col rounded-2xl bg-gradient-to-br ${category.className} p-8 text-white transition-shadow hover:shadow-lg`}
+                  >
                     <Icon className="mb-4 h-12 w-12" />
                     <h3 className="mb-2 text-xl">{category.title}</h3>
-                    <p className={`mb-4 text-sm ${category.textClassName}`}>{category.description}</p>
-                    <span className="flex items-center gap-2 text-sm transition-all group-hover:gap-3">
+                    <p className={`mb-4 flex-1 text-sm ${category.textClassName}`}>{category.description}</p>
+                    <span className="mt-auto flex items-center gap-2 text-sm transition-all group-hover:gap-3">
                       Explore <ArrowRight className="h-4 w-4" />
                     </span>
                   </div>
