@@ -32,6 +32,16 @@ Apply migrations so the `users` table and seed data exist (requires `DATABASE_UR
 npm run db:migrate
 ```
 
+This applies all files in `apps/api/db/migrations/`, including password-reset tokens (`014_password_reset_tokens.sql`).
+
+### Email, password reset, and payments (optional)
+
+Configure these on the **API** (`apps/api/.env` or repo root `.env`):
+
+- **`PUBLIC_SITE_URL`** — public site base URL used in password-reset links (e.g. `https://your-site.com`).
+- **`RESEND_API_KEY`** + **`RESEND_FROM_EMAIL`** — when set, the API sends transactional mail via [Resend](https://resend.com/) (password reset, order confirmation, and the same copy as in-app notifications). If unset, emails are skipped (logged only).
+- **`RAZORPAY_KEY_ID`** + **`RAZORPAY_KEY_SECRET`** — when both are set, `/checkout` can collect **INR** payments through Razorpay for catalog items priced in INR. Otherwise checkout stays on the **demo purchase** flow (immediate paid order for testing).
+
 ### Test login (after migrate)
 
 Seeded accounts use the same password for local testing:

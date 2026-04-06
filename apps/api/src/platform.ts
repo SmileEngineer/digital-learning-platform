@@ -63,6 +63,7 @@ export type CatalogCardDto = {
   image: string;
   coverImage: string;
   price: number;
+  currency: string;
   duration: string;
   students: number;
   rating?: number;
@@ -133,6 +134,7 @@ export function mapCatalogItem(row: CatalogItemRow): CatalogCardDto {
     image: row.image_url,
     coverImage: row.image_url,
     price: asMoney(row.price),
+    currency: row.currency,
     duration:
       row.duration_label ??
       (row.time_limit_minutes ? `${row.time_limit_minutes} minutes` : row.pages ? `${row.pages} pages` : ''),

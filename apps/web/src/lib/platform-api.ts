@@ -21,6 +21,8 @@ export type CatalogItem = {
   image: string;
   coverImage: string;
   price: number;
+  /** ISO currency code from catalog (e.g. INR). */
+  currency: string;
   duration: string;
   students: number;
   rating?: number;
@@ -613,6 +615,55 @@ export async function purchaseCatalogItem(input: {
   };
 }): Promise<{ ok: true; orderId: string; orderNumber: string; total: number; item: CatalogItem; unlocked: boolean }> {
   return postJson('/api/platform/checkout/purchase', input);
+}
+
+export async function fetchCheckoutCapabilities(): Promise<{ demo: boolean; razorpay: boolean }> {
+  return getJson<{ demo: boolean; razorpay: boolean }>('/api/platform/checkout/capabilities');
+}
+
+export async function createRazorpayServerOrder(input: {
+  product: string;
+  couponCode?: string;
+  quantity?: number;
+  shipping?: {
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    addressLine?: string;
+    city?: string;
+    state?: string;
+    pinCode?: string;
+  };
+}): Promise<{ keyId: string; orderId: string; amount: number; currency: string }> {
+  return postJson('/api/platform/checkout/razorpay/order', input);
+}
+
+export async function verifyRazorpayCheckout(input: {
+  product: string;
+  couponCode?: string;
+  quantity?: number;
+  shipping?: {
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    addressLine?: string;
+    city?: string;
+    state?: string;
+    pinCode?: string;
+  };
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}): Promise<{ ok: true; orderId: string; orderNumber: string; total: number; item: CatalogItem; unlocked: boolean }> {
+  return postJson('/api/platform/checkout/razorpay/verify', input);
+}
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  await postJson('/api/auth/forgot-password', { email });
+}
+
+export async function resetPasswordWithToken(input: { token: string; password: string }): Promise<void> {
+  await postJson('/api/auth/reset-password', input);
 }
 
 export async function fetchDashboardOverview(): Promise<DashboardOverview> {

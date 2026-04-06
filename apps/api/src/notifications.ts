@@ -1,4 +1,5 @@
 import type { NeonQueryFunction } from '@neondatabase/serverless';
+import { sendEmailIfConfigured } from './mailer.js';
 
 type NotifyUserInput = {
   userId: string;
@@ -55,4 +56,10 @@ export async function notifyUser(
       ${JSON.stringify(metadata)}::jsonb
     )
   `;
+
+  await sendEmailIfConfigured({
+    to: input.email,
+    subject: input.title,
+    text: input.message,
+  });
 }

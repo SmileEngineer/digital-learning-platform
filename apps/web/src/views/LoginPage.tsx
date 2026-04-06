@@ -17,6 +17,7 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const nextPath = searchParams.get('next') || '/dashboard';
+  const passwordResetOk = searchParams.get('reset') === '1';
 
   useEffect(() => {
     if (user) {
@@ -63,6 +64,14 @@ export function LoginPage() {
 
         <div className="rounded-lg border border-slate-200 bg-white p-8">
           <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+            {passwordResetOk && (
+              <div
+                className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900"
+                role="status"
+              >
+                Your password was updated. Sign in with your new password.
+              </div>
+            )}
             {error && (
               <div
                 className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
