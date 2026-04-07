@@ -28,12 +28,12 @@ export function CatalogFilterBanner() {
     >
       <span className="font-semibold text-indigo-900">Catalog: </span>
       {state && <span>{labelForState(state, base)}</span>}
-      {state && university && <span className="text-indigo-600"> · </span>}
+      {state && university && <span className="text-indigo-600"> / </span>}
       {university && state && (
         <span>{labelForUniversity(state, university, base)}</span>
       )}
       {(state || university) && semester && (
-        <span className="text-indigo-600"> · </span>
+        <span className="text-indigo-600"> / </span>
       )}
       {semester && <span>{semLabel}</span>}
     </div>

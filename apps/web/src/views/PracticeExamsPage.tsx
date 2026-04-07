@@ -61,7 +61,7 @@ export function PracticeExamsPage() {
             </div>
             <Button variant="outline">
               <SlidersHorizontal className="w-4 h-4 mr-2" />
-              Backend filters coming next
+              Timed secure exams
             </Button>
           </div>
         </div>

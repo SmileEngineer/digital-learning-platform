@@ -51,7 +51,7 @@ async function loadSessionUser(
   if (!payload) return null;
 
   const rows = await sql`
-    SELECT id, email, name, role, phone, admin_permissions
+    SELECT id, email, name, role, phone, admin_permissions, active_session_id
     FROM users
     WHERE id = ${payload.sub}
     LIMIT 1
@@ -61,8 +61,19 @@ async function loadSessionUser(
     return null;
   }
 
-  const user = rows[0] as SessionUser;
-  return user;
+  const user = rows[0] as SessionUser & { active_session_id: string | null };
+  if (user.active_session_id !== payload.sessionId) {
+    return null;
+  }
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    phone: user.phone,
+    admin_permissions: user.admin_permissions,
+  };
 }
 
 export async function getSessionUser(

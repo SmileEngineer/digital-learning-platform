@@ -31,7 +31,7 @@ export function CourseCard({
   universityName,
   semesterLabel,
 }: CourseCardProps) {
-  const browseSummary = [stateName, universityName, semesterLabel].filter(Boolean).join(' • ');
+  const browseSummary = [stateName, universityName, semesterLabel].filter(Boolean).join(' / ');
 
   return (
     <Link href={`/courses/${id}`} className="group">

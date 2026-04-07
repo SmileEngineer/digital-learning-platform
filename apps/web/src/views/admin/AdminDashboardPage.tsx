@@ -7,16 +7,22 @@ import { Button } from '../../components/Button';
 import { DollarSign, Eye, Settings, Users, Video } from 'lucide-react';
 import { fetchAdminAnalytics, fetchSiteSettings, updateSiteSettings, type AdminAnalyticsSummary, type SiteSettings } from '@/lib/platform-api';
 import { useAuth } from '@/contexts/AuthContext';
+import { formatRupees } from '@/lib/price';
 
 function hasPermission(user: { role: string; adminPermissions?: string[] } | null, permission: string): boolean {
   if (!user) return false;
   return user.role === 'super_admin' || (user.adminPermissions ?? []).includes(permission);
 }
 
+const defaultScrollerSettings: SiteSettings = {
+  homeScrollerEnabled: true,
+  homeScrollerMessage: 'Site is under construction. No orders will be fulfilled at this time.',
+};
+
 export function AdminDashboardPage() {
   const { user } = useAuth();
   const [analytics, setAnalytics] = useState<AdminAnalyticsSummary | null>(null);
-  const [settings, setSettings] = useState<SiteSettings>({ homeScrollerEnabled: false, homeScrollerMessage: '' });
+  const [settings, setSettings] = useState<SiteSettings>(defaultScrollerSettings);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -31,8 +37,8 @@ export function AdminDashboardPage() {
         const [analyticsData, settingsData] = await Promise.all([
           canViewAnalytics ? fetchAdminAnalytics().catch(() => null) : Promise.resolve(null),
           canManageSettings
-            ? fetchSiteSettings().catch(() => ({ homeScrollerEnabled: false, homeScrollerMessage: '' }))
-            : Promise.resolve({ homeScrollerEnabled: false, homeScrollerMessage: '' }),
+            ? fetchSiteSettings().catch(() => defaultScrollerSettings)
+            : Promise.resolve(defaultScrollerSettings),
         ]);
         if (!cancelled) {
           setAnalytics(analyticsData);
@@ -66,7 +72,7 @@ export function AdminDashboardPage() {
 
   const cards = analytics
     ? [
-        { label: 'Total Revenue', value: `$${analytics.totals.revenue.toFixed(2)}`, icon: DollarSign },
+        { label: 'Total Revenue', value: formatRupees(analytics.totals.revenue), icon: DollarSign },
         { label: 'Total Users', value: String(analytics.totals.users), icon: Users },
         { label: 'Active Users', value: String(analytics.totals.activeUsers), icon: Eye },
         { label: 'Live Class Attendance', value: String(analytics.totals.liveClassAttendance), icon: Video },

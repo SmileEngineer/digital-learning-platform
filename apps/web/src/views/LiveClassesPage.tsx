@@ -61,7 +61,7 @@ export function LiveClassesPage() {
             </div>
             <Button variant="outline">
               <SlidersHorizontal className="w-4 h-4 mr-2" />
-              Backend filters coming next
+              Scheduled Google Meet classes
             </Button>
           </div>
         </div>

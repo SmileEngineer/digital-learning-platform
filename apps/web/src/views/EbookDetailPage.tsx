@@ -140,7 +140,7 @@ export function EbookDetailPage() {
   }
 
   if (loading) {
-    return <div className="container mx-auto px-4 py-12 text-slate-600">Loading ebook…</div>;
+    return <div className="container mx-auto px-4 py-12 text-slate-600">Loading ebook...</div>;
   }
 
   if (!reader || !item || error) {
@@ -354,7 +354,7 @@ export function EbookDetailPage() {
                       disabled={!item.downloadAllowed || downloading}
                     >
                       <Download className="w-4 h-4 mr-2" />
-                      {item.downloadAllowed ? (downloading ? 'Preparing Download…' : 'Download Copy') : 'Download Disabled'}
+                      {item.downloadAllowed ? (downloading ? 'Preparing Download...' : 'Download Copy') : 'Download Disabled'}
                     </Button>
                   </>
                 ) : (

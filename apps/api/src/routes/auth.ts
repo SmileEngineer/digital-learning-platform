@@ -43,9 +43,10 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
       }
 
       const passwordHash = await hashPassword(password);
+      const sessionId = randomBytes(32).toString('hex');
       const inserted = await sql`
-        INSERT INTO users (email, password_hash, name, role)
-        VALUES (${emailRaw}, ${passwordHash}, ${name}, 'student')
+        INSERT INTO users (email, password_hash, name, role, active_session_id)
+        VALUES (${emailRaw}, ${passwordHash}, ${name}, 'student', ${sessionId})
         RETURNING id, email, name, role, admin_permissions, created_at
       `;
 
@@ -56,7 +57,7 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
         role: 'student' | 'admin' | 'staff' | 'super_admin';
         admin_permissions: string[];
       };
-      const token = signUserToken(row.id, row.email, row.name, row.role);
+      const token = signUserToken(row.id, row.email, row.name, row.role, sessionId);
 
       res.status(201).json({
         token,
@@ -107,7 +108,14 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
         return;
       }
 
-      const token = signUserToken(user.id, user.email, user.name, user.role);
+      const sessionId = randomBytes(32).toString('hex');
+      await sql`
+        UPDATE users
+        SET active_session_id = ${sessionId}
+        WHERE id = ${user.id}
+      `;
+
+      const token = signUserToken(user.id, user.email, user.name, user.role, sessionId);
       res.json({
         token,
         user: {
@@ -227,7 +235,10 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
       }
 
       const rows = await sql`
-        SELECT id, email, name, role, admin_permissions, created_at FROM users WHERE id = ${payload.sub} LIMIT 1
+        SELECT id, email, name, role, admin_permissions, active_session_id, created_at
+        FROM users
+        WHERE id = ${payload.sub}
+        LIMIT 1
       `;
       if (rows.length === 0) {
         res.status(401).json({ error: 'Account not found.' });
@@ -240,8 +251,13 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
         name: string;
         role: 'student' | 'admin' | 'staff' | 'super_admin';
         admin_permissions: string[];
+        active_session_id: string | null;
         created_at: string;
       };
+      if (u.active_session_id !== payload.sessionId) {
+        res.status(401).json({ error: 'This account is active on another device. Please sign in again.' });
+        return;
+      }
       res.json({
         user: {
           id: u.id,

@@ -23,11 +23,17 @@ export function verifyPassword(plain: string, hash: string): Promise<boolean> {
   return bcrypt.compare(plain, hash);
 }
 
-export function signUserToken(userId: string, email: string, name: string, role: UserRole): string {
-  return jwt.sign({ sub: userId, email, name, role }, getJwtSecret(), { expiresIn: '7d' });
+export function signUserToken(
+  userId: string,
+  email: string,
+  name: string,
+  role: UserRole,
+  sessionId: string
+): string {
+  return jwt.sign({ sub: userId, email, name, role, sid: sessionId }, getJwtSecret(), { expiresIn: '7d' });
 }
 
-export type JwtUserPayload = { sub: string; email: string; name: string; role: UserRole };
+export type JwtUserPayload = { sub: string; email: string; name: string; role: UserRole; sessionId: string };
 
 export function verifyUserToken(token: string): JwtUserPayload | null {
   try {
@@ -39,11 +45,18 @@ export function verifyUserToken(token: string): JwtUserPayload | null {
       (decoded.role !== 'student' &&
         decoded.role !== 'admin' &&
         decoded.role !== 'staff' &&
-        decoded.role !== 'super_admin')
+        decoded.role !== 'super_admin') ||
+      typeof decoded.sid !== 'string'
     ) {
       return null;
     }
-    return { sub: decoded.sub, email: decoded.email, name: decoded.name, role: decoded.role };
+    return {
+      sub: decoded.sub,
+      email: decoded.email,
+      name: decoded.name,
+      role: decoded.role,
+      sessionId: decoded.sid,
+    };
   } catch {
     return null;
   }

@@ -35,7 +35,7 @@ export function EbookCard({
   universityName,
   semesterLabel,
 }: EbookCardProps) {
-  const browseSummary = [stateName, universityName, semesterLabel].filter(Boolean).join(' • ');
+  const browseSummary = [stateName, universityName, semesterLabel].filter(Boolean).join(' / ');
 
   return (
     <Link href={`/ebooks/${id}`} className="group">
@@ -69,7 +69,7 @@ export function EbookCard({
           
           <div className="flex items-center gap-3 mb-3 text-sm text-slate-600">
             <span>{pages} pages</span>
-            <span>•</span>
+            <span>/</span>
             <span>{format}</span>
           </div>
           

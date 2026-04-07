@@ -15,6 +15,7 @@ import {
   type AdminCourseInput,
   type CourseSummary,
 } from '@/lib/course-api';
+import { formatRupees } from '@/lib/price';
 
 type LectureFormState = {
   title: string;
@@ -822,7 +823,7 @@ export function CourseManagementPage() {
               {loading ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-10 text-center text-slate-500">
-                    Loading courses…
+                    Preparing course list...
                   </td>
                 </tr>
               ) : sortedCourses.length === 0 ? (
@@ -842,7 +843,7 @@ export function CourseManagementPage() {
                     </td>
                     <td className="px-6 py-4">{course.category}</td>
                     <td className="px-6 py-4">{course.studentsCount}</td>
-                    <td className="px-6 py-4">${course.price.toFixed(2)}</td>
+                    <td className="px-6 py-4">{formatRupees(course.price)}</td>
                     <td className="px-6 py-4">
                       {course.accessType === 'fixed_months' && course.accessMonths
                         ? `${course.accessMonths} months`

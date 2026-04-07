@@ -574,13 +574,28 @@ async function getText(url: string): Promise<string> {
   return res.text();
 }
 
+const catalogListCache = new Map<
+  CatalogItemType,
+  { expiresAt: number; promise: Promise<CatalogItem[]> }
+>();
+const CATALOG_LIST_CACHE_MS = 60_000;
+
 export async function fetchHomeHighlights(): Promise<HomeHighlights> {
   return getJson<HomeHighlights>('/api/platform/catalog/highlights');
 }
 
 export async function fetchCatalogItems(type: CatalogItemType): Promise<CatalogItem[]> {
-  const data = await getJson<{ items: CatalogItem[] }>(`/api/platform/catalog/items?type=${type}`);
-  return data.items;
+  const cached = catalogListCache.get(type);
+  if (cached && cached.expiresAt > Date.now()) return cached.promise;
+
+  const promise = getJson<{ items: CatalogItem[] }>(`/api/platform/catalog/items?type=${type}`)
+    .then((data) => data.items)
+    .catch((error) => {
+      catalogListCache.delete(type);
+      throw error;
+    });
+  catalogListCache.set(type, { expiresAt: Date.now() + CATALOG_LIST_CACHE_MS, promise });
+  return promise;
 }
 
 export async function fetchCheckoutQuote(input: {

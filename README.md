@@ -57,19 +57,19 @@ Use these on `/login` with the web app and API running (`npm run dev` and `npm r
 
 ### Sample materials and checkout testing
 
-Additional demo content is seeded by `apps/api/db/migrations/005_seed_more_demo_materials.sql`.
+Kantri Lawyer sample content is seeded by `apps/api/db/migrations/015_kantri_requirement_alignment.sql`.
 
 Sample slugs you can use for manual testing:
 
 | Type            | Slug                                 | Notes                    |
 | --------------- | ------------------------------------ | ------------------------ |
-| Course          | `cloud-devops-accelerator`           | 3-month access           |
-| Course          | `complete-web-development-bootcamp`  | 6-month access           |
-| eBook           | `ui-ux-design-playbook`              | Lifetime access          |
-| Physical book   | `system-design-interview-kit`        | Shipping flow            |
-| Live class      | `sql-analytics-live-bootcamp`        | Scheduled session        |
-| Practice exam   | `full-stack-developer-practice-exam` | Limited attempts         |
-| Article         | `how-to-plan-a-6-month-learning-path`| Free catalog article     |
+| Course          | `law-of-contracts-i-ou-semester-1`   | Lifetime access with preview lecture |
+| eBook           | `last-minute-exam-prep-guide-llb-first-semester-tg` | Watermarked reader/download |
+| eBook           | `last-minute-exam-prep-guide-llb-first-semester-ap` | Watermarked reader/download |
+| Physical book   | `last-minute-exam-prep-guide-llb-first-semester-tg-physical-book` | DTDC shipping flow |
+| Live class      | `law-of-contracts-i-live-revision-class` | Google Meet gated join |
+| Practice exam   | `law-of-contracts-i-practice-exam` | Limited attempts and hidden answers |
+| Article         | `law-of-contracts-i-study-article` | Free read-only article |
 
 Demo coupon for checkout testing:
 
@@ -88,7 +88,7 @@ Recommended manual test flow:
 
 ### Auth behavior
 
-- **Express:** `POST /auth/register`, `POST /auth/login`, `GET /auth/me` — bcrypt passwords; JWT issued on register/login.
+- **Express:** `POST /auth/register`, `POST /auth/login`, `GET /auth/me` — bcrypt passwords; JWT issued on register/login with a per-user active session id so a new login invalidates older sessions.
 - **Next.js:** `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout` proxy to Express and store the JWT in an **httpOnly, SameSite=Lax** cookie (`learnhub_session`). The browser never sees the token; use `credentials: 'include'` on auth fetches.
 - **Dashboard:** `/dashboard` requires a valid session; unauthenticated users are sent to `/login?next=/dashboard`.
 

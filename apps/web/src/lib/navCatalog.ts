@@ -1,4 +1,4 @@
-/** Browse-by catalog: State → University → Semester (I–VI), aligned with Kantri Lawyer–style navigation. */
+/** Browse-by catalog: main menu -> sub-menu -> optional semester, aligned with the supplied workbook. */
 
 export const SEMESTER_ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI'] as const;
 export type SemesterIndex = 1 | 2 | 3 | 4 | 5 | 6;
@@ -15,82 +15,65 @@ const COURSE_CATEGORIES: CatalogStateItem[] = [
     universities: [
       { id: 'kakatiya-university', name: 'Kakatiya University', semesters: true },
       { id: 'osmania-university', name: 'Osmania University', semesters: true },
-      { id: 'palamuru-university', name: 'Palamuru University', semesters: true },
-      { id: 'satavahana-university', name: 'Satavahana University', semesters: true },
-      { id: 'telangana-university', name: 'Telangana University', semesters: true },
-      { id: 'mahatma-gandhi-university', name: 'Mahatma Gandhi University', semesters: true },
+      { id: 'palamuru-university', name: 'Palamuru University', semesters: false },
+      { id: 'satavahana-university', name: 'Satavahana University', semesters: false },
+      { id: 'telangana-university', name: 'Telangana University', semesters: false },
+      { id: 'mahatma-gandhi-university', name: 'Mahatma Gandhi University', semesters: false },
     ],
   },
   {
     id: 'andhra-pradesh',
     name: 'Andhra Pradesh',
     universities: [
-      { id: 'acharya-nagarjuna-university', name: 'Acharya Nagarjuna University', semesters: true },
-      { id: 'adikavi-nannaya-university', name: 'Adikavi Nannaya University', semesters: true },
-      { id: 'ambedkar-university', name: 'Ambedkar University', semesters: true },
-      { id: 'andhra-kesari-university', name: 'Andhra Kesari University', semesters: true },
-      { id: 'andhra-university', name: 'Andhra University', semesters: true },
+      { id: 'andhra-university', name: 'Andhra University', semesters: false },
+      { id: 'acharya-nagarjuna-university', name: 'Acharya Nagarjuna University', semesters: false },
+      { id: 'adikavi-nannaya-university', name: 'Adikavi Nannaya University', semesters: false },
+      { id: 'andhra-kesari-university', name: 'Andhra Kesari University', semesters: false },
       {
         id: 'damodaram-sanjivayya-national-law-university',
         name: 'Damodaram Sanjivayya National Law University',
-        semesters: true,
+        semesters: false,
       },
-      { id: 'kl-university', name: 'KL University', semesters: true },
-      { id: 'krishna-university', name: 'Krishna University', semesters: true },
-      { id: 'rayalaseema-university', name: 'Rayalaseema University', semesters: true },
-      { id: 'sri-krishnadevaraya-university', name: 'Sri Krishnadevaraya University', semesters: true },
+      { id: 'kl-university', name: 'KL University', semesters: false },
+      { id: 'krishna-university', name: 'Krishna University', semesters: false },
+      { id: 'rayalaseema-university', name: 'Rayalaseema University', semesters: false },
+      { id: 'sri-krishnadevaraya-university', name: 'Sri Krishnadevaraya University', semesters: false },
       {
         id: 'sri-padmavati-mahila-visva-vidyalayam',
         name: 'Sri Padmavati Mahila Visva Vidyalayam',
-        semesters: true,
+        semesters: false,
       },
-      { id: 'sri-venkateswara-university', name: 'Sri Venkateswara University', semesters: true },
-      { id: 'vikrama-simhapuri-university', name: 'Vikrama Simhapuri University', semesters: true },
-      { id: 'yogi-vemana-university', name: 'Yogi Vemana University', semesters: true },
+      { id: 'sri-venkateswara-university', name: 'Sri Venkateswara University', semesters: false },
+      { id: 'vikrama-simhapuri-university', name: 'Vikrama Simhapuri University', semesters: false },
+      { id: 'yogi-vemana-university', name: 'Yogi Vemana University', semesters: false },
     ],
-  },
-  {
-    id: 'karnataka',
-    name: 'Karnataka',
-    universities: [{ id: 'karnataka-state-law-university', name: 'Karnataka State Law University', semesters: true }],
   },
   {
     id: 'lawcet',
     name: 'LAWCET',
     universities: [
-      { id: 'ts-lawcet', name: 'TS LAWCET', semesters: false },
       { id: 'ap-lawcet', name: 'AP LAWCET', semesters: false },
+      { id: 'ts-lawcet', name: 'TS LAWCET', semesters: false },
     ],
   },
   {
     id: 'clat',
     name: 'CLAT',
-    universities: [
-      { id: 'clat-in-telugu', name: 'CLAT in Telugu', semesters: false },
-      { id: 'clat-in-english', name: 'CLAT in English', semesters: false },
-    ],
+    universities: [{ id: 'clat', name: 'CLAT', semesters: false }],
   },
   {
     id: 'aibe',
     name: 'AIBE',
-    universities: [
-      { id: 'aibe-in-telugu', name: 'AIBE in Telugu', semesters: false },
-      { id: 'aibe-in-english', name: 'AIBE in English', semesters: false },
-    ],
+    universities: [{ id: 'aibe', name: 'AIBE', semesters: false }],
   },
   {
     id: 'bare-acts',
     name: 'Bare Acts',
-    universities: [
-      { id: 'bare-acts-in-telugu', name: 'Bare Acts in Telugu', semesters: false },
-      { id: 'bare-acts-in-english', name: 'Bare Acts in English', semesters: false },
-    ],
+    universities: [{ id: 'bare-acts', name: 'Bare Acts', semesters: false }],
   },
 ];
 
-const EBOOK_CATEGORIES: CatalogStateItem[] = COURSE_CATEGORIES.filter(
-  (item) => !['clat', 'aibe', 'bare-acts'].includes(item.id)
-);
+const EBOOK_CATEGORIES: CatalogStateItem[] = COURSE_CATEGORIES;
 
 const CATALOG_BY_BASE: Record<CatalogBase, CatalogStateItem[]> = {
   '/courses': COURSE_CATEGORIES,

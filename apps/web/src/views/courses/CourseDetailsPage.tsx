@@ -81,6 +81,28 @@ export function CourseDetailsPage() {
     };
   }, [slug]);
 
+  useEffect(() => {
+    const blockContextMenu = (event: MouseEvent) => event.preventDefault();
+    const blockShortcuts = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      const ctrlLike = event.ctrlKey || event.metaKey;
+      if (
+        key === 'f12' ||
+        (ctrlLike && event.shiftKey && ['i', 'j', 'c'].includes(key)) ||
+        (ctrlLike && ['u', 's', 'p'].includes(key))
+      ) {
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener('contextmenu', blockContextMenu);
+    window.addEventListener('keydown', blockShortcuts);
+    return () => {
+      window.removeEventListener('contextmenu', blockContextMenu);
+      window.removeEventListener('keydown', blockShortcuts);
+    };
+  }, []);
+
   const visibleLectureCount = useMemo(
     () => course?.sections.reduce((sum, section) => sum + section.lectures.length, 0) ?? 0,
     [course]
@@ -154,7 +176,7 @@ export function CourseDetailsPage() {
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-12 text-slate-600">
-        Loading course details…
+        Loading course details...
       </div>
     );
   }
@@ -227,7 +249,7 @@ export function CourseDetailsPage() {
 
               {course.hasAccess && (
                 <div className="mb-4 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
-                  {course.progressPercent}% complete • {course.completedLectures} lecture
+                  {course.progressPercent}% complete - {course.completedLectures} lecture
                   {course.completedLectures === 1 ? '' : 's'} completed
                 </div>
               )}
@@ -273,7 +295,7 @@ export function CourseDetailsPage() {
                   </div>
                   <p className="text-sm text-slate-600">
                     Duration: {selectedLecture.durationText}
-                    {selectedLecture.quizTitle ? ` • Quiz: ${selectedLecture.quizTitle}` : ''}
+                    {selectedLecture.quizTitle ? ` - Quiz: ${selectedLecture.quizTitle}` : ''}
                   </p>
                 </div>
               )}
@@ -296,9 +318,9 @@ export function CourseDetailsPage() {
                 <div>
                   <h2 className="text-2xl">Course Content</h2>
                   <p className="text-slate-600 mt-1">
-                    {course.sections.length} sections • {visibleLectureCount} visible lectures
+                    {course.sections.length} sections - {visibleLectureCount} visible lectures
                     {!course.hasAccess && course.previewLectureCount > 0
-                      ? ` • preview mode (${course.previewLectureCount} preview lecture${course.previewLectureCount > 1 ? 's' : ''})`
+                      ? ` - preview mode (${course.previewLectureCount} preview lecture${course.previewLectureCount > 1 ? 's' : ''})`
                       : ''}
                   </p>
                 </div>

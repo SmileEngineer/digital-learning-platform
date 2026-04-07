@@ -2,11 +2,15 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { LogOut, ShoppingCart, User } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { type FormEvent, useEffect, useState } from 'react';
+import { LogOut, Search, ShoppingCart, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { fetchHomeHighlights } from '@/lib/platform-api';
 import { NavMegaMenuTrigger } from './NavMegaMenu';
 import { MobileCatalogDrawer } from './MobileCatalogDrawer';
+
+const underConstructionNotice = 'Site is under construction. No orders will be fulfilled at this time.';
 
 function NavLink({
   href,
@@ -31,20 +35,49 @@ function NavLink({
 
 export function Header() {
   const { user, logout } = useAuth();
+  const pathname = usePathname();
+  const router = useRouter();
+  const [scroller, setScroller] = useState({ enabled: true, message: underConstructionNotice });
+  const [headerSearch, setHeaderSearch] = useState('');
   const accountHref =
     user?.role === 'staff' || user?.role === 'admin' || user?.role === 'super_admin' ? '/admin' : '/dashboard';
-  const notice = 'Site is under construction. No orders will be fulfilled at this time.';
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchHomeHighlights()
+      .then((data) => {
+        if (!cancelled) setScroller(data.scroller);
+      })
+      .catch(() => {
+        if (!cancelled) setScroller({ enabled: true, message: underConstructionNotice });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const notice = scroller.message.trim();
+  const searchBase = pathname.startsWith('/ebooks') ? '/ebooks' : '/courses';
+
+  function handleHeaderSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = headerSearch.trim();
+    if (!query) return;
+    router.push(`${searchBase}?search=${encodeURIComponent(query)}`);
+  }
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200/90 bg-white/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/90">
-      <div className="overflow-hidden border-b border-amber-200 bg-amber-100 text-amber-950">
-        <div className="kantri-marquee">
-          <div className="kantri-marquee-track py-2 text-sm font-medium">
-            <span>{notice}</span>
-            <span aria-hidden="true">{notice}</span>
+      {scroller.enabled && notice && (
+        <div className="overflow-hidden border-b border-amber-200 bg-amber-100 text-amber-950">
+          <div className="kantri-marquee">
+            <div className="kantri-marquee-track py-2 text-sm font-medium">
+              <span>{notice}</span>
+              <span aria-hidden="true">{notice}</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="container mx-auto px-4">
         <div className="flex h-[4.375rem] items-center justify-between gap-4">
@@ -67,6 +100,20 @@ export function Header() {
                 </span>
               </div>
             </Link>
+            <form
+              onSubmit={handleHeaderSearch}
+              className="hidden min-w-[10rem] max-w-[13rem] flex-1 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 xl:flex 2xl:max-w-[16rem]"
+            >
+              <Search className="mr-2 h-4 w-4 shrink-0 text-slate-400" />
+              <input
+                type="search"
+                value={headerSearch}
+                onChange={(event) => setHeaderSearch(event.target.value)}
+                placeholder="Search..."
+                className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                aria-label="Search catalog"
+              />
+            </form>
           </div>
 
           <nav className="hidden items-center gap-1 lg:flex">
@@ -76,7 +123,7 @@ export function Header() {
             <NavLink href="/books">Physical Books</NavLink>
             <NavLink href="/live-classes">Live Classes</NavLink>
             <NavLink href="/practice-exams">Practice Exams</NavLink>
-            <NavLink href="/articles">Articles</NavLink>
+            <NavLink href="/articles">Article</NavLink>
             <NavLink href="/contact">Contact</NavLink>
           </nav>
 

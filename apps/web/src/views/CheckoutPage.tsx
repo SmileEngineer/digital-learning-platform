@@ -314,7 +314,7 @@ export function CheckoutPage() {
                     <p>{quote.shipping.message}</p>
                     {quote.shipping.deliveryAvailable && quote.shipping.estimatedDays ? (
                       <p className="mt-1">
-                        Carrier: {quote.shipping.carrier} • Estimated delivery in {quote.shipping.estimatedDays} day
+                        Carrier: {quote.shipping.carrier} - Estimated delivery in {quote.shipping.estimatedDays} day
                         {quote.shipping.estimatedDays === 1 ? '' : 's'}
                         {quote.shipping.city ? ` to ${quote.shipping.city}` : ''}.
                       </p>
@@ -409,7 +409,7 @@ export function CheckoutPage() {
                     (requiresShipping && quote?.shipping.deliveryAvailable === false)
                   }
                 >
-                  {submitting ? 'Processing…' : 'Pay with Razorpay'}
+                  {submitting ? 'Processing...' : 'Pay with Razorpay'}
                 </Button>
               ) : (
                 <Button
@@ -423,7 +423,7 @@ export function CheckoutPage() {
                     (requiresShipping && quote?.shipping.deliveryAvailable === false)
                   }
                 >
-                  {submitting ? 'Processing…' : 'Complete demo purchase'}
+                  {submitting ? 'Processing...' : 'Complete demo purchase'}
                 </Button>
               )}
 

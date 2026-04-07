@@ -114,15 +114,29 @@ async function parseJson<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 
+const courseListCache = new Map<string, { expiresAt: number; promise: Promise<CourseSummary[]> }>();
+const COURSE_LIST_CACHE_MS = 60_000;
+
 export async function fetchCourses(query?: { q?: string; category?: string }): Promise<CourseSummary[]> {
   const params = new URLSearchParams();
   if (query?.q) params.set('q', query.q);
   if (query?.category && query.category !== 'All') params.set('category', query.category);
+  const cacheKey = params.toString() || 'all';
+  const cached = courseListCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.promise;
+
   const res = await fetch(`/api/courses${params.size ? `?${params.toString()}` : ''}`, {
     cache: 'no-store',
   });
   if (!res.ok) throw new Error(await readAuthError(res));
-  return (await parseJson<{ courses: CourseSummary[] }>(res)).courses;
+  const promise = parseJson<{ courses: CourseSummary[] }>(res)
+    .then((data) => data.courses)
+    .catch((error) => {
+      courseListCache.delete(cacheKey);
+      throw error;
+    });
+  courseListCache.set(cacheKey, { expiresAt: Date.now() + COURSE_LIST_CACHE_MS, promise });
+  return promise;
 }
 
 export async function fetchCourseDetail(
@@ -194,6 +208,7 @@ export async function createAdminCourse(input: AdminCourseInput): Promise<AdminC
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await readAuthError(res));
+  courseListCache.clear();
   return (await parseJson<{ course: AdminCourse }>(res)).course;
 }
 
@@ -205,5 +220,6 @@ export async function updateAdminCourse(id: string, input: AdminCourseInput): Pr
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await readAuthError(res));
+  courseListCache.clear();
   return (await parseJson<{ course: AdminCourse }>(res)).course;
 }

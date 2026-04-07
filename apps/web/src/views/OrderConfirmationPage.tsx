@@ -13,7 +13,7 @@ export function OrderConfirmationPage() {
             <CheckCircle className="w-12 h-12 text-green-600" />
           </div>
           <h1 className="text-3xl mb-2">Order Confirmed!</h1>
-          <p className="text-slate-600">Order #ORD-2026-4321</p>
+          <p className="text-slate-600">Order #KL-DEMO-2026-0001</p>
         </div>
         
         <Card className="mb-6">
@@ -23,18 +23,17 @@ export function OrderConfirmationPage() {
             <div className="flex items-start gap-4 pb-4 border-b border-slate-200">
               <div className="w-16 h-16 bg-slate-200 rounded"></div>
               <div className="flex-1">
-                <h3 className="mb-1">Complete Web Development Bootcamp</h3>
+                <h3 className="mb-1">Law of Contracts - I - OU Semester-1</h3>
                 <p className="text-sm text-slate-600">Course</p>
               </div>
               <div className="text-right">
-                <div className="text-lg">{formatRupees(71.99)}</div>
-                <div className="text-sm text-slate-600">20% off applied</div>
+                <div className="text-lg">{formatRupees(999)}</div>
               </div>
             </div>
             
             <div className="flex justify-between">
               <span>Total Paid</span>
-              <span className="text-xl text-indigo-600">{formatRupees(71.99)}</span>
+              <span className="text-xl text-indigo-600">{formatRupees(999)}</span>
             </div>
           </div>
         </Card>

@@ -27,15 +27,23 @@ export async function getSessionUser(
   if (!payload) return null;
 
   const rows = await sql`
-    SELECT id, email, name, role, admin_permissions
+    SELECT id, email, name, role, admin_permissions, active_session_id
     FROM users
     WHERE id = ${payload.sub}
     LIMIT 1
   `;
   if (rows.length === 0) return null;
 
-  const user = rows[0] as SessionUser;
-  return user;
+  const user = rows[0] as SessionUser & { active_session_id: string | null };
+  if (user.active_session_id !== payload.sessionId) return null;
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    admin_permissions: user.admin_permissions,
+  };
 }
 
 export async function requireSessionUser(

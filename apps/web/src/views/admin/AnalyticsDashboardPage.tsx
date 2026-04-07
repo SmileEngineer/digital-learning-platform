@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card } from '../../components/Card';
 import { fetchAdminAnalytics, type AdminAnalyticsSummary } from '@/lib/platform-api';
+import { formatRupees } from '@/lib/price';
 
 export function AnalyticsDashboardPage() {
   const [analytics, setAnalytics] = useState<AdminAnalyticsSummary | null>(null);
@@ -38,7 +39,7 @@ export function AnalyticsDashboardPage() {
             {(analytics?.revenueByModule ?? []).map((entry) => (
               <div key={entry.module} className="flex justify-between text-sm">
                 <span>{entry.module}</span>
-                <span>${entry.revenue.toFixed(2)}</span>
+                <span>{formatRupees(entry.revenue)}</span>
               </div>
             ))}
           </div>
@@ -71,7 +72,7 @@ export function AnalyticsDashboardPage() {
               <div key={entry.label} className="flex justify-between">
                 <span>{entry.label}</span>
                 <span>
-                  {entry.orders} orders • ${entry.revenue.toFixed(2)}
+                  {entry.orders} orders - {formatRupees(entry.revenue)}
                 </span>
               </div>
             ))}
@@ -85,7 +86,7 @@ export function AnalyticsDashboardPage() {
               <div key={entry.label} className="flex justify-between">
                 <span>{entry.label}</span>
                 <span>
-                  {entry.orders} orders • ${entry.revenue.toFixed(2)}
+                  {entry.orders} orders - {formatRupees(entry.revenue)}
                 </span>
               </div>
             ))}

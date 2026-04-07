@@ -60,9 +60,9 @@ export function NavMegaMenuTrigger({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-4 grid grid-cols-3 gap-2 border-b border-slate-100 pb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <span>State</span>
-            <span>University</span>
-              <span>{showSemesters ? 'Semester' : 'Browse'}</span>
+            <span>Main Menu</span>
+            <span>Sub Menu</span>
+            <span>{showSemesters ? 'Sub-sub Menu' : 'Browse'}</span>
           </div>
 
           <div className="grid max-h-[min(70vh,22rem)] grid-cols-3 gap-4">
@@ -73,7 +73,7 @@ export function NavMegaMenuTrigger({
                     href={`${base}?state=${encodeURIComponent(s.id)}`}
                     onMouseEnter={() => setStateId(s.id)}
                     onFocus={() => setStateId(s.id)}
-                    className={`w-full rounded-lg px-3 py-2 text-left transition-colors ${
+                    className={`flex w-full rounded-lg px-3 py-2 text-left transition-colors ${
                       stateId === s.id
                         ? 'bg-indigo-50 font-semibold text-indigo-900'
                         : 'text-slate-700 hover:bg-slate-50'
@@ -91,7 +91,7 @@ export function NavMegaMenuTrigger({
                   <Link
                     href={`${base}?state=${encodeURIComponent(stateId)}&university=${encodeURIComponent(u.id)}`}
                     onClick={() => setUniversityId(u.id)}
-                    className={`w-full rounded-lg px-3 py-2 text-left transition-colors ${
+                    className={`flex w-full rounded-lg px-3 py-2 text-left transition-colors ${
                       activeUniversityId === u.id
                         ? 'bg-indigo-50 font-semibold text-indigo-950'
                         : 'text-slate-800 hover:bg-slate-50'
@@ -106,7 +106,7 @@ export function NavMegaMenuTrigger({
             <div className="border-l border-slate-100 pl-4">
               {showSemesters ? (
                 <>
-                  <p className="mb-2 text-xs font-medium text-slate-500">Semester I – VI</p>
+                  <p className="mb-2 text-xs font-medium text-slate-500">Sem - I to Sem - VI</p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {([1, 2, 3, 4, 5, 6] as const).map((sem) => (
                       <Link
@@ -137,7 +137,7 @@ export function NavMegaMenuTrigger({
                 </div>
               )}
               <p className="mt-3 text-[0.7rem] leading-snug text-slate-500">
-                Browse {label.toLowerCase()} by state, university, and semester. You can also click{' '}
+                Browse {label.toLowerCase()} by main menu, sub menu, and semester where available. You can also click{' '}
                 {labelForState(stateId, base)}
                 {activeUniversityId ? `, ${labelForUniversity(stateId, activeUniversityId, base)}` : ''}
                 {showSemesters ? ', or any semester directly.' : ' directly.'}

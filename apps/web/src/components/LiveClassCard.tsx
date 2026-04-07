@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Badge } from './Badge';
 import { Button } from './Button';
 import { Calendar, Clock } from 'lucide-react';
+import { formatRupees } from '@/lib/price';
 
 interface LiveClassCardProps {
   id: string;
@@ -77,7 +78,7 @@ export function LiveClassCard({
           )}
           
           <div className="flex items-center justify-between">
-            <span className="text-2xl text-indigo-600">${price}</span>
+            <span className="text-2xl text-indigo-600">{formatRupees(price)}</span>
             <Button size="sm">{isCancelled ? 'View Details' : 'Enroll Now'}</Button>
           </div>
         </div>

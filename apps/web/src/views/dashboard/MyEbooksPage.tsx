@@ -57,7 +57,7 @@ export function MyEbooksPage() {
 
   return (
     <div>
-      <h1 className="text-3xl mb-8">My eBooks & PDFs</h1>
+      <h1 className="text-3xl mb-8">My eBooks</h1>
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
       <div className="grid grid-cols-1 gap-4">
@@ -68,7 +68,7 @@ export function MyEbooksPage() {
               <div className="flex-1">
                 <h3 className="mb-1">{ebook.title}</h3>
                 <div className="text-sm text-slate-600">
-                  {ebook.pages ?? 0} pages • {ebook.format ?? 'PDF'} • {ebook.accessLabel}
+                  {ebook.pages ?? 0} pages / {ebook.format ?? 'PDF'} / {ebook.accessLabel}
                 </div>
               </div>
               <div className="flex gap-2">

@@ -4,27 +4,11 @@ export default function ShippingPolicyPage() {
   return (
     <LegalDocumentPage
       title="Shipping Policy"
-      intro="This policy applies to physical book orders placed through Kantri Lawyer."
+      intro=""
       sections={[
         {
-          heading: 'Delivery Coverage',
           body: [
-            'Physical book shipments are subject to service availability for the provided PIN code. Delivery timelines may vary by region, logistics availability, and stock readiness.',
-            'Shipping validation may be re-checked during checkout to confirm that the delivery address is serviceable.',
-          ],
-        },
-        {
-          heading: 'Processing and Dispatch',
-          body: [
-            'Orders are processed after successful payment confirmation. Dispatch timing may vary depending on stock position and operational conditions.',
-            'Estimated delivery timelines are indicative and may change because of courier delays, holidays, weather, or other external factors.',
-          ],
-        },
-        {
-          heading: 'Address Accuracy',
-          body: [
-            'Please provide complete and accurate shipping information, including phone number and PIN code, to avoid delay or failed delivery attempts.',
-            'Kantri Lawyer is not responsible for delays caused by incomplete or incorrect address details entered by the customer.',
+            'For Domestic (within India) buyers, orders are shipped and delivered through registered courier companies and/or speed post only. Currently we are not delivering the physical items (books) for International buyers. If they need, they can buy ebooks or courses or practice exams from the website. Physical Books Orders are shipped within 3-5 working days or as per the delivery date agreed at the time of order confirmation and delivering of the shipment subject to Courier Company / post office norms. K Keerthi is not liable for any delay in delivery by the courier company / postal authorities and only guarantees to hand over the consignment to the courier company or postal authorities within 3-5 working days from the date of the order and payment or as per the delivery date agreed at the time of order confirmation. Delivery of all orders will be to the address provided by the buyer. Delivery of our services will be confirmed on your email ID as specified during registration or production confirmation. For any issues in utilizing our services you may contact our helpdesk on 9392907777 or uday@kantrilawyer.com',
           ],
         },
       ]}

@@ -492,7 +492,7 @@ export function ManageEbooksPage() {
           >
             <div className="space-y-4">
               {loading ? (
-                <p className="text-slate-600">Loading ebooks…</p>
+                <p className="text-slate-600">Preparing eBook list...</p>
               ) : orderedItems.length === 0 ? (
                 <p className="text-slate-600">No ebooks created yet.</p>
               ) : (

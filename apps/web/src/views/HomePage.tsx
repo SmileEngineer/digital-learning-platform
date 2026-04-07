@@ -6,6 +6,7 @@ import { ArrowRight, Award, BookOpen, BookText, FileText, Video } from 'lucide-r
 import { CourseCard } from '@/components/CourseCard';
 import { UniversityShowcase, type UniversityShowcaseSection } from '@/components/UniversityShowcase';
 import { fetchCourses, type CourseSummary } from '@/lib/course-api';
+import { fetchCatalogItems } from '@/lib/platform-api';
 import { buildBrowseHref, findBrowseSelection, getAllUniversities } from '@/lib/catalog-browse';
 
 const categories = [
@@ -57,6 +58,8 @@ export function HomePage() {
   useEffect(() => {
     let cancelled = false;
 
+    void fetchCatalogItems('ebook').catch(() => undefined);
+
     fetchCourses()
       .then((items) => {
         if (!cancelled) {
@@ -104,16 +107,16 @@ export function HomePage() {
 
   return (
     <div>
-      <section className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 py-14 text-white">
+      <section className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 py-10 text-white">
         <div className="container mx-auto px-4">
-          <div className="mx-auto max-w-4xl py-6 text-center">
+          <div className="mx-auto max-w-4xl py-4 text-center">
             <p className="text-xl font-semibold text-indigo-100 sm:text-2xl">
               Kantri by Awareness, Honest by Conscience.
             </p>
-            <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">
+            <h1 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl lg:text-4xl">
               An anonymous voice on a mission to simplify the law for the common people.
             </h1>
-            <p className="mx-auto mt-4 max-w-3xl text-base text-indigo-100 sm:text-lg">
+            <p className="mx-auto mt-3 max-w-3xl text-base text-indigo-100 sm:text-lg">
               A sincere desire to build responsible citizens with strong values is my credential.
             </p>
           </div>

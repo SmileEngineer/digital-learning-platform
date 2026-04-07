@@ -531,7 +531,7 @@ export function createAdminBooksRouter(sql: NeonQueryFunction<false, false>): Ro
               ? 'shipping'
               : status === 'cancelled'
                 ? 'cancelled'
-                : 'processing'
+                : 'pending'
         }
         WHERE id = ${shipment.order_id}
       `;

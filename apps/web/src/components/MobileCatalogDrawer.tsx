@@ -44,7 +44,7 @@ function CatalogSection({
       <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
         {title}
       </p>
-      <p className="mb-2 text-[0.7rem] font-medium text-slate-500">State</p>
+      <p className="mb-2 text-[0.7rem] font-medium text-slate-500">Main Menu</p>
       <div className="mb-3 flex flex-wrap gap-2">
         {states.map((s) => (
           <Link
@@ -61,7 +61,7 @@ function CatalogSection({
           </Link>
         ))}
       </div>
-      <p className="mb-2 text-[0.7rem] font-medium text-slate-500">University</p>
+      <p className="mb-2 text-[0.7rem] font-medium text-slate-500">Sub Menu</p>
       <div className="mb-3 flex flex-col gap-1">
         {universities.map((u) => (
           <Link
@@ -78,7 +78,7 @@ function CatalogSection({
       </div>
       {showSemesters ? (
         <>
-          <p className="mb-2 text-[0.7rem] font-medium text-slate-500">Semester I – VI</p>
+          <p className="mb-2 text-[0.7rem] font-medium text-slate-500">Sem - I to Sem - VI</p>
           <div className="grid grid-cols-3 gap-2">
             {([1, 2, 3, 4, 5, 6] as const).map((sem) => (
               <Link
@@ -166,7 +166,7 @@ export function MobileCatalogDrawer() {
             className="rounded-lg px-3 py-2 text-slate-800 hover:bg-slate-100"
             onClick={() => setOpen(false)}
           >
-            Articles
+            Article
           </Link>
           <Link
             href="/contact"
@@ -178,8 +178,8 @@ export function MobileCatalogDrawer() {
         </nav>
 
         <div className="mt-6 space-y-4 border-t border-slate-200 pt-6">
-          <CatalogSection title="Courses — State · University · Semester" base="/courses" />
-          <CatalogSection title="eBooks — State · University · Semester" base="/ebooks" />
+          <CatalogSection title="Courses - Main Menu / Sub Menu / Semester" base="/courses" />
+          <CatalogSection title="eBooks - Main Menu / Sub Menu / Semester" base="/ebooks" />
         </div>
       </SheetContent>
     </Sheet>

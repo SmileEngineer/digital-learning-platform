@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Badge } from './Badge';
 import { Button } from './Button';
 import { Clock, FileText, Award } from 'lucide-react';
+import { formatRupees } from '@/lib/price';
 
 interface PracticeExamCardProps {
   id: string;
@@ -66,7 +67,7 @@ export function PracticeExamCard({
         </div>
         
         <div className="flex items-center justify-between border-t border-slate-200 pt-3">
-          <span className="text-2xl text-indigo-600">${price}</span>
+          <span className="text-2xl text-indigo-600">{formatRupees(price)}</span>
           <Button size="sm">View Exam</Button>
         </div>
       </div>
