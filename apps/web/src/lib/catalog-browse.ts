@@ -119,7 +119,13 @@ export function normalizeSemesterLabel(label?: string | null): string {
 }
 
 function normalizeName(value?: string | null): string {
-  return (value ?? '').trim().toLowerCase();
+  return (value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export function matchesBrowseSelection(

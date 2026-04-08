@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { MapPin, Package, Truck, Star } from 'lucide-react';
+import { MapPin, Package, Truck } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { Card } from '../components/Card';
@@ -75,15 +75,6 @@ export function PhysicalBookDetailPage() {
               </Badge>
               <h1 className="text-4xl mb-3">{item.title}</h1>
               <p className="text-lg text-slate-600 mb-4">by {item.author ?? item.instructor}</p>
-
-              {item.rating && (
-                <div className="flex items-center gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
-                    <span>{item.rating.toFixed(1)} rating</span>
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="mb-8">

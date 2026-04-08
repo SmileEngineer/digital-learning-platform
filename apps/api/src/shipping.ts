@@ -59,15 +59,28 @@ export async function lookupDeliveryAvailability(
   `) as DeliveryRow[];
 
   const row = rows[0] ?? null;
-  if (!row || !row.is_active) {
+  if (row && !row.is_active) {
     return {
       pinCode: pin,
       available: false,
-      carrier: row?.carrier ?? 'DTDC',
-      city: row?.city ?? null,
-      state: row?.state ?? null,
+      carrier: row.carrier,
+      city: row.city,
+      state: row.state,
       estimatedDays: null,
       message: 'DTDC delivery is not currently available for this PIN code.',
+      trackingBaseUrl: buildDtdcTrackingUrl('TRACKING_NUMBER'),
+    };
+  }
+
+  if (!row) {
+    return {
+      pinCode: pin,
+      available: true,
+      carrier: 'DTDC',
+      city: null,
+      state: null,
+      estimatedDays: 5,
+      message: 'DTDC delivery can be arranged for this PIN code. Final confirmation happens at order processing.',
       trackingBaseUrl: buildDtdcTrackingUrl('TRACKING_NUMBER'),
     };
   }

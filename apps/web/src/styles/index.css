@@ -11,15 +11,16 @@
   width: max-content;
   gap: 3rem;
   white-space: nowrap;
+  will-change: transform;
   animation: kantri-marquee 20s linear infinite;
 }
 
 @keyframes kantri-marquee {
   from {
-    transform: translateX(0);
+    transform: translateX(100%);
   }
 
   to {
-    transform: translateX(-50%);
+    transform: translateX(-100%);
   }
 }

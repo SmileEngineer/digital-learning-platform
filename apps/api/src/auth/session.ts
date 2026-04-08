@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
+import { hasActiveSessionColumn } from './active-session.js';
 import { verifyUserToken } from './crypto.js';
 
 export type SessionUser = {
@@ -50,19 +51,27 @@ async function loadSessionUser(
   const payload = verifyUserToken(token);
   if (!payload) return null;
 
-  const rows = await sql`
-    SELECT id, email, name, role, phone, admin_permissions, active_session_id
-    FROM users
-    WHERE id = ${payload.sub}
-    LIMIT 1
-  `;
+  const canTrackActiveSession = await hasActiveSessionColumn(sql);
+  const rows = canTrackActiveSession
+    ? await sql`
+        SELECT id, email, name, role, phone, admin_permissions, active_session_id
+        FROM users
+        WHERE id = ${payload.sub}
+        LIMIT 1
+      `
+    : await sql`
+        SELECT id, email, name, role, phone, admin_permissions
+        FROM users
+        WHERE id = ${payload.sub}
+        LIMIT 1
+      `;
 
   if (rows.length === 0) {
     return null;
   }
 
   const user = rows[0] as SessionUser & { active_session_id: string | null };
-  if (user.active_session_id !== payload.sessionId) {
+  if (canTrackActiveSession && user.active_session_id !== payload.sessionId) {
     return null;
   }
 

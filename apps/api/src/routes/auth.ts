@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Router } from 'express';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
+import { hasActiveSessionColumn } from '../auth/active-session.js';
 import { hashPassword, signUserToken, verifyPassword, verifyUserToken } from '../auth/crypto.js';
 import { parseBearer } from '../auth/request-user.js';
 import { sendPasswordResetEmail } from '../mailer.js';
@@ -44,11 +45,18 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
 
       const passwordHash = await hashPassword(password);
       const sessionId = randomBytes(32).toString('hex');
-      const inserted = await sql`
-        INSERT INTO users (email, password_hash, name, role, active_session_id)
-        VALUES (${emailRaw}, ${passwordHash}, ${name}, 'student', ${sessionId})
-        RETURNING id, email, name, role, admin_permissions, created_at
-      `;
+      const canTrackActiveSession = await hasActiveSessionColumn(sql);
+      const inserted = canTrackActiveSession
+        ? await sql`
+            INSERT INTO users (email, password_hash, name, role, active_session_id)
+            VALUES (${emailRaw}, ${passwordHash}, ${name}, 'student', ${sessionId})
+            RETURNING id, email, name, role, admin_permissions, created_at
+          `
+        : await sql`
+            INSERT INTO users (email, password_hash, name, role)
+            VALUES (${emailRaw}, ${passwordHash}, ${name}, 'student')
+            RETURNING id, email, name, role, admin_permissions, created_at
+          `;
 
       const row = inserted[0] as {
         id: string;
@@ -109,11 +117,13 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
       }
 
       const sessionId = randomBytes(32).toString('hex');
-      await sql`
-        UPDATE users
-        SET active_session_id = ${sessionId}
-        WHERE id = ${user.id}
-      `;
+      if (await hasActiveSessionColumn(sql)) {
+        await sql`
+          UPDATE users
+          SET active_session_id = ${sessionId}
+          WHERE id = ${user.id}
+        `;
+      }
 
       const token = signUserToken(user.id, user.email, user.name, user.role, sessionId);
       res.json({
@@ -234,12 +244,20 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
         return;
       }
 
-      const rows = await sql`
-        SELECT id, email, name, role, admin_permissions, active_session_id, created_at
-        FROM users
-        WHERE id = ${payload.sub}
-        LIMIT 1
-      `;
+      const canTrackActiveSession = await hasActiveSessionColumn(sql);
+      const rows = canTrackActiveSession
+        ? await sql`
+            SELECT id, email, name, role, admin_permissions, active_session_id, created_at
+            FROM users
+            WHERE id = ${payload.sub}
+            LIMIT 1
+          `
+        : await sql`
+            SELECT id, email, name, role, admin_permissions, created_at
+            FROM users
+            WHERE id = ${payload.sub}
+            LIMIT 1
+          `;
       if (rows.length === 0) {
         res.status(401).json({ error: 'Account not found.' });
         return;
@@ -254,7 +272,7 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
         active_session_id: string | null;
         created_at: string;
       };
-      if (u.active_session_id !== payload.sessionId) {
+      if (canTrackActiveSession && u.active_session_id !== payload.sessionId) {
         res.status(401).json({ error: 'This account is active on another device. Please sign in again.' });
         return;
       }

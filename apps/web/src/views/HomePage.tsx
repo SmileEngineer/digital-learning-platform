@@ -107,23 +107,23 @@ export function HomePage() {
 
   return (
     <div>
-      <section className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 py-10 text-white">
+      <section className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 py-6 text-white">
         <div className="container mx-auto px-4">
-          <div className="mx-auto max-w-4xl py-4 text-center">
-            <p className="text-xl font-semibold text-indigo-100 sm:text-2xl">
+          <div className="mx-auto max-w-4xl py-2 text-center">
+            <p className="text-lg font-semibold text-indigo-100 sm:text-xl">
               Kantri by Awareness, Honest by Conscience.
             </p>
-            <h1 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl lg:text-4xl">
+            <h1 className="mt-2 text-xl font-black tracking-tight sm:text-2xl lg:text-3xl">
               An anonymous voice on a mission to simplify the law for the common people.
             </h1>
-            <p className="mx-auto mt-3 max-w-3xl text-base text-indigo-100 sm:text-lg">
+            <p className="mx-auto mt-2 max-w-3xl text-sm text-indigo-100 sm:text-base">
               A sincere desire to build responsible citizens with strong values is my credential.
             </p>
           </div>
         </div>
       </section>
 
-      <section className="bg-white py-16">
+      <section className="bg-white py-12">
         <div className="container mx-auto px-4">
           <div className="mx-auto mb-10 max-w-2xl text-center">
             <h2 className="mb-3 text-3xl font-bold text-slate-900">Explore by Category</h2>

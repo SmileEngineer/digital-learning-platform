@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChevronDown } from 'lucide-react';
@@ -29,15 +29,9 @@ export function NavMegaMenuTrigger({
 }) {
   const states = getStates(base);
   const [stateId, setStateId] = useState(states[0]?.id ?? '');
-  const universities = getUniversities(stateId, base);
-  const [universityId, setUniversityId] = useState(() => universities[0]?.id ?? '');
-
-  useEffect(() => {
-    const next = getUniversities(stateId, base);
-    setUniversityId(next[0]?.id ?? '');
-  }, [base, stateId]);
-
-  const activeUniversityId = universityId || universities[0]?.id || '';
+  const [universityId, setUniversityId] = useState('');
+  const universities = useMemo(() => getUniversities(stateId, base), [base, stateId]);
+  const activeUniversityId = universities.some((u) => u.id === universityId) ? universityId : '';
   const showSemesters = activeUniversityId ? supportsSemesters(stateId, activeUniversityId, base) : false;
   const pathname = usePathname();
   const sectionActive = pathname === base || pathname.startsWith(`${base}/`);
@@ -71,8 +65,14 @@ export function NavMegaMenuTrigger({
                 <li key={s.id}>
                   <Link
                     href={`${base}?state=${encodeURIComponent(s.id)}`}
-                    onMouseEnter={() => setStateId(s.id)}
-                    onFocus={() => setStateId(s.id)}
+                    onMouseEnter={() => {
+                      setStateId(s.id);
+                      setUniversityId('');
+                    }}
+                    onFocus={() => {
+                      setStateId(s.id);
+                      setUniversityId('');
+                    }}
                     className={`flex w-full rounded-lg px-3 py-2 text-left transition-colors ${
                       stateId === s.id
                         ? 'bg-indigo-50 font-semibold text-indigo-900'
@@ -90,6 +90,8 @@ export function NavMegaMenuTrigger({
                 <li key={u.id}>
                   <Link
                     href={`${base}?state=${encodeURIComponent(stateId)}&university=${encodeURIComponent(u.id)}`}
+                    onMouseEnter={() => setUniversityId(u.id)}
+                    onFocus={() => setUniversityId(u.id)}
                     onClick={() => setUniversityId(u.id)}
                     className={`flex w-full rounded-lg px-3 py-2 text-left transition-colors ${
                       activeUniversityId === u.id
@@ -104,7 +106,15 @@ export function NavMegaMenuTrigger({
             </ul>
 
             <div className="border-l border-slate-100 pl-4">
-              {showSemesters ? (
+              {!activeUniversityId ? (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-4 text-sm text-slate-600">
+                  <p className="font-medium text-slate-900">Hover a university to preview semesters</p>
+                  <p className="mt-2">
+                    State, university, and semester are all clickable. Hover a university first to see its semester
+                    links in this panel.
+                  </p>
+                </div>
+              ) : showSemesters ? (
                 <>
                   <p className="mb-2 text-xs font-medium text-slate-500">Sem - I to Sem - VI</p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -137,9 +147,9 @@ export function NavMegaMenuTrigger({
                 </div>
               )}
               <p className="mt-3 text-[0.7rem] leading-snug text-slate-500">
-                Browse {label.toLowerCase()} by main menu, sub menu, and semester where available. You can also click{' '}
+                Browse {label.toLowerCase()} by main menu, sub menu, and semester where available. You can click{' '}
                 {labelForState(stateId, base)}
-                {activeUniversityId ? `, ${labelForUniversity(stateId, activeUniversityId, base)}` : ''}
+                {activeUniversityId ? `, ${labelForUniversity(stateId, activeUniversityId, base)}` : ', any university'}
                 {showSemesters ? ', or any semester directly.' : ' directly.'}
               </p>
             </div>
