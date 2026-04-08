@@ -41,8 +41,10 @@ function loadRazorpayScript(): Promise<void> {
 export function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const productSlug = searchParams.get('product') ?? '';
+  const checkoutPath = productSlug ? `/checkout?product=${encodeURIComponent(productSlug)}` : '/checkout';
+  const loginPath = `/login?next=${encodeURIComponent(checkoutPath)}`;
   const [product, setProduct] = useState<CatalogItem | null>(null);
   const [quote, setQuote] = useState<CheckoutQuote | null>(null);
   const [loading, setLoading] = useState(true);
@@ -150,7 +152,7 @@ export function CheckoutPage() {
 
   async function handleDemoPurchase() {
     if (!user) {
-      router.push(`/login?next=/checkout?product=${encodeURIComponent(productSlug)}`);
+      router.push(loginPath);
       return;
     }
     try {
@@ -166,7 +168,7 @@ export function CheckoutPage() {
 
   async function handleRazorpay() {
     if (!user) {
-      router.push(`/login?next=/checkout?product=${encodeURIComponent(productSlug)}`);
+      router.push(loginPath);
       return;
     }
     if (!product || product.currency !== 'INR') {
@@ -251,99 +253,121 @@ export function CheckoutPage() {
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
-            <Card>
-              <h2 className="mb-4 text-xl">Billing Information</h2>
-              <form className="space-y-4">
-                <div>
-                  <label className="mb-2 block text-sm">Full Name</label>
-                  <input
-                    type="text"
-                    value={billingName}
-                    onChange={(e) => setBillingName(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm">Email</label>
-                  <input
-                    type="email"
-                    value={billingEmail}
-                    onChange={(e) => setBillingEmail(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
-                  />
-                </div>
-              </form>
-            </Card>
-
-            {requiresShipping && (
+            {authLoading ? (
               <Card>
-                <h2 className="mb-4 text-xl">Shipping Information</h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  {(
-                    [
-                      ['fullName', 'Full Name'],
-                      ['email', 'Email'],
-                      ['phone', 'Phone Number'],
-                      ['addressLine', 'Full Address'],
-                      ['city', 'City'],
-                      ['state', 'State'],
-                      ['pinCode', 'Postal PIN Code'],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <div key={key} className={key === 'addressLine' ? 'md:col-span-2' : ''}>
-                      <label className="mb-2 block text-sm">{label}</label>
+                <p className="text-slate-600">Loading checkout details...</p>
+              </Card>
+            ) : !user ? (
+              <Card>
+                <h2 className="mb-3 text-xl">Sign In Required</h2>
+                <p className="mb-5 text-sm text-slate-600">
+                  Billing, shipping, and payment details are available only after sign-in. Complete authentication
+                  first, then continue with checkout.
+                </p>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Button onClick={() => router.push(loginPath)}>Sign in to continue</Button>
+                  <Button variant="outline" onClick={() => router.push('/courses')}>
+                    Browse catalog
+                  </Button>
+                </div>
+              </Card>
+            ) : (
+              <>
+                <Card>
+                  <h2 className="mb-4 text-xl">Billing Information</h2>
+                  <form className="space-y-4">
+                    <div>
+                      <label className="mb-2 block text-sm">Full Name</label>
                       <input
                         type="text"
-                        value={shipping[key]}
-                        onChange={(e) =>
-                          setShipping((current) => ({ ...current, [key]: e.target.value }))
-                        }
+                        value={billingName}
+                        onChange={(e) => setBillingName(e.target.value)}
                         className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
                       />
                     </div>
-                  ))}
-                </div>
-                {quote?.shipping.message && (
-                  <div
-                    className={`mt-4 rounded-lg border px-4 py-3 text-sm ${
-                      quote.shipping.deliveryAvailable
-                        ? 'border-green-200 bg-green-50 text-green-800'
-                        : 'border-red-200 bg-red-50 text-red-700'
-                    }`}
-                  >
-                    <p>{quote.shipping.message}</p>
-                    {quote.shipping.deliveryAvailable && quote.shipping.estimatedDays ? (
-                      <p className="mt-1">
-                        Carrier: {quote.shipping.carrier} - Estimated delivery in {quote.shipping.estimatedDays} day
-                        {quote.shipping.estimatedDays === 1 ? '' : 's'}
-                        {quote.shipping.city ? ` to ${quote.shipping.city}` : ''}.
-                      </p>
-                    ) : null}
-                  </div>
-                )}
-              </Card>
-            )}
+                    <div>
+                      <label className="mb-2 block text-sm">Email</label>
+                      <input
+                        type="email"
+                        value={billingEmail}
+                        onChange={(e) => setBillingEmail(e.target.value)}
+                        className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
+                      />
+                    </div>
+                  </form>
+                </Card>
 
-            <Card>
-              <h2 className="mb-3 text-xl">Payment</h2>
-              <div className="flex gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                <Lock className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" />
-                <div>
-                  {useRazorpay ? (
-                    <p>
-                      Secure payment is processed by <strong>Razorpay</strong> (cards, UPI, netbanking where supported).
-                      Configure <code className="text-xs">RAZORPAY_KEY_ID</code> and{' '}
-                      <code className="text-xs">RAZORPAY_KEY_SECRET</code> on the API.
-                    </p>
-                  ) : (
-                    <p>
-                      <strong>Demo checkout:</strong> card fields are not used. Completing purchase records a paid order
-                      immediately for testing. For production INR payments, configure Razorpay on the API.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </Card>
+                {requiresShipping && (
+                  <Card>
+                    <h2 className="mb-4 text-xl">Shipping Information</h2>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      {(
+                        [
+                          ['fullName', 'Full Name'],
+                          ['email', 'Email'],
+                          ['phone', 'Phone Number'],
+                          ['addressLine', 'Full Address'],
+                          ['city', 'City'],
+                          ['state', 'State'],
+                          ['pinCode', 'Postal PIN Code'],
+                        ] as const
+                      ).map(([key, label]) => (
+                        <div key={key} className={key === 'addressLine' ? 'md:col-span-2' : ''}>
+                          <label className="mb-2 block text-sm">{label}</label>
+                          <input
+                            type="text"
+                            value={shipping[key]}
+                            onChange={(e) =>
+                              setShipping((current) => ({ ...current, [key]: e.target.value }))
+                            }
+                            className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    {quote?.shipping.message && (
+                      <div
+                        className={`mt-4 rounded-lg border px-4 py-3 text-sm ${
+                          quote.shipping.deliveryAvailable
+                            ? 'border-green-200 bg-green-50 text-green-800'
+                            : 'border-red-200 bg-red-50 text-red-700'
+                        }`}
+                      >
+                        <p>{quote.shipping.message}</p>
+                        {quote.shipping.deliveryAvailable && quote.shipping.estimatedDays ? (
+                          <p className="mt-1">
+                            Carrier: {quote.shipping.carrier} - Estimated delivery in {quote.shipping.estimatedDays} day
+                            {quote.shipping.estimatedDays === 1 ? '' : 's'}
+                            {quote.shipping.city ? ` to ${quote.shipping.city}` : ''}.
+                          </p>
+                        ) : null}
+                      </div>
+                    )}
+                  </Card>
+                )}
+
+                <Card>
+                  <h2 className="mb-3 text-xl">Payment</h2>
+                  <div className="flex gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                    <Lock className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" />
+                    <div>
+                      {useRazorpay ? (
+                        <p>
+                          Secure payment is processed by <strong>Razorpay</strong> (cards, UPI, netbanking where supported).
+                          Configure <code className="text-xs">RAZORPAY_KEY_ID</code> and{' '}
+                          <code className="text-xs">RAZORPAY_KEY_SECRET</code> on the API.
+                        </p>
+                      ) : (
+                        <p>
+                          <strong>Demo checkout:</strong> card fields are not used. Completing purchase records a paid order
+                          immediately for testing. For production INR payments, configure Razorpay on the API.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              </>
+            )}
           </div>
 
           <div className="lg:col-span-1">
@@ -367,7 +391,7 @@ export function CheckoutPage() {
               {message && <p className="mb-3 text-sm text-green-700">{message}</p>}
               {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
-              {requiresShipping && (
+              {requiresShipping && user && (
                 <Button
                   fullWidth
                   variant="outline"
@@ -397,7 +421,15 @@ export function CheckoutPage() {
                 <span className="text-indigo-600">{formatRupees(total)}</span>
               </div>
 
-              {useRazorpay ? (
+              {authLoading ? (
+                <Button fullWidth size="lg" disabled>
+                  Loading...
+                </Button>
+              ) : !user ? (
+                <Button fullWidth size="lg" onClick={() => router.push(loginPath)} disabled={!productSlug}>
+                  Sign in to continue
+                </Button>
+              ) : useRazorpay ? (
                 <Button
                   fullWidth
                   size="lg"
@@ -428,7 +460,9 @@ export function CheckoutPage() {
               )}
 
               <p className="mt-4 text-center text-xs text-slate-600">
-                {useRazorpay
+                {!user
+                  ? 'Please sign in before entering billing, shipping, or payment details.'
+                  : useRazorpay
                   ? 'You will complete payment in the Razorpay window. Orders are confirmed after successful payment.'
                   : 'Demo mode creates a paid order and unlocks digital access without a real payment gateway.'}
               </p>

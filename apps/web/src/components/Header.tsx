@@ -140,7 +140,7 @@ export function Header() {
               </>
             )}
             <Link
-              href="/checkout"
+              href={user ? '/checkout' : '/login?next=%2Fcheckout'}
               className="relative flex items-center rounded-lg p-2 text-slate-700 hover:bg-slate-100"
               aria-label="Cart"
             >
