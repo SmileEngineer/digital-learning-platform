@@ -6,6 +6,16 @@ export type AuthUser = {
   adminPermissions?: string[];
 };
 
+export type AuthProfile = {
+  id: string;
+  email: string;
+  name: string;
+  role: 'student' | 'admin' | 'staff' | 'super_admin';
+  phone: string;
+  bio: string;
+  profileImageUrl: string | null;
+};
+
 export async function readAuthError(res: Response): Promise<string> {
   try {
     const data = (await res.json()) as { error?: string };
@@ -60,6 +70,35 @@ export async function postAuthChangePassword(
     credentials: 'include',
     body: JSON.stringify({ currentPassword, newPassword }),
   });
+}
+
+export async function fetchAuthProfile(): Promise<AuthProfile> {
+  const res = await fetch('/api/auth/profile', {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(await readAuthError(res));
+  const data = (await res.json()) as { profile: AuthProfile };
+  return data.profile;
+}
+
+export async function patchAuthProfile(input: {
+  name: string;
+  email: string;
+  phone: string;
+  bio: string;
+  profileImageUrl: string | null;
+}): Promise<AuthProfile> {
+  const res = await fetch('/api/auth/profile', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await readAuthError(res));
+  const data = (await res.json()) as { profile: AuthProfile };
+  return data.profile;
 }
 
 export async function postAuthLogout(): Promise<Response> {

@@ -2,11 +2,25 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Router } from 'express';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import { hasActiveSessionColumn } from '../auth/active-session.js';
+import { getUserProfileColumnAvailability } from '../auth/profile-columns.js';
 import { hashPassword, signUserToken, verifyPassword, verifyUserToken } from '../auth/crypto.js';
 import { parseBearer } from '../auth/request-user.js';
 import { sendPasswordResetEmail } from '../mailer.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function parseOptionalString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function isAllowedProfileImage(value: string): boolean {
+  return (
+    /^https?:\/\//i.test(value) ||
+    /^data:image\/(?:png|jpeg|jpg);base64,[a-z0-9+/=]+$/i.test(value)
+  );
+}
 
 export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
   const router = Router();
@@ -251,6 +265,217 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
     } catch (e) {
       console.error('change-password', e);
       res.status(500).json({ error: 'Could not update password.' });
+    }
+  });
+
+  router.get('/profile', async (req, res) => {
+    try {
+      const token = parseBearer(req);
+      if (!token) {
+        res.status(401).json({ error: 'Not signed in.' });
+        return;
+      }
+
+      const payload = verifyUserToken(token);
+      if (!payload) {
+        res.status(401).json({ error: 'Session expired. Please sign in again.' });
+        return;
+      }
+
+      const canTrackActiveSession = await hasActiveSessionColumn(sql);
+      const profileColumns = await getUserProfileColumnAvailability(sql);
+      const rows =
+        canTrackActiveSession && profileColumns.bio && profileColumns.profileImageUrl
+          ? await sql`
+              SELECT id, email, name, role, phone, bio, profile_image_url, active_session_id
+              FROM users
+              WHERE id = ${payload.sub}
+              LIMIT 1
+            `
+          : canTrackActiveSession
+            ? await sql`
+                SELECT id, email, name, role, phone, active_session_id
+                FROM users
+                WHERE id = ${payload.sub}
+                LIMIT 1
+              `
+            : profileColumns.bio && profileColumns.profileImageUrl
+              ? await sql`
+                  SELECT id, email, name, role, phone, bio, profile_image_url
+                  FROM users
+                  WHERE id = ${payload.sub}
+                  LIMIT 1
+                `
+              : await sql`
+                  SELECT id, email, name, role, phone
+                  FROM users
+                  WHERE id = ${payload.sub}
+                  LIMIT 1
+                `;
+
+      if (rows.length === 0) {
+        res.status(401).json({ error: 'Account not found.' });
+        return;
+      }
+
+      const user = rows[0] as {
+        id: string;
+        email: string;
+        name: string;
+        role: 'student' | 'admin' | 'staff' | 'super_admin';
+        phone: string | null;
+        bio?: string | null;
+        profile_image_url?: string | null;
+        active_session_id?: string | null;
+      };
+
+      if (canTrackActiveSession && user.active_session_id !== payload.sessionId) {
+        res.status(401).json({ error: 'This account is active on another device. Please sign in again.' });
+        return;
+      }
+
+      res.json({
+        profile: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          phone: user.phone ?? '',
+          bio: profileColumns.bio ? (user.bio ?? '') : '',
+          profileImageUrl: profileColumns.profileImageUrl ? (user.profile_image_url ?? null) : null,
+        },
+      });
+    } catch (e) {
+      console.error('profile:get', e);
+      res.status(500).json({ error: 'Could not load profile settings.' });
+    }
+  });
+
+  router.patch('/profile', async (req, res) => {
+    try {
+      const token = parseBearer(req);
+      if (!token) {
+        res.status(401).json({ error: 'Not signed in.' });
+        return;
+      }
+
+      const payload = verifyUserToken(token);
+      if (!payload) {
+        res.status(401).json({ error: 'Session expired. Please sign in again.' });
+        return;
+      }
+
+      const profileColumns = await getUserProfileColumnAvailability(sql);
+      if (!profileColumns.bio || !profileColumns.profileImageUrl) {
+        res.status(503).json({ error: 'Profile settings storage is not ready. Run the latest database migrations.' });
+        return;
+      }
+
+      const canTrackActiveSession = await hasActiveSessionColumn(sql);
+      const rows = canTrackActiveSession
+        ? await sql`
+            SELECT id, role, active_session_id
+            FROM users
+            WHERE id = ${payload.sub}
+            LIMIT 1
+          `
+        : await sql`
+            SELECT id, role
+            FROM users
+            WHERE id = ${payload.sub}
+            LIMIT 1
+          `;
+
+      if (rows.length === 0) {
+        res.status(401).json({ error: 'Account not found.' });
+        return;
+      }
+
+      const current = rows[0] as {
+        id: string;
+        role: 'student' | 'admin' | 'staff' | 'super_admin';
+        active_session_id?: string | null;
+      };
+
+      if (canTrackActiveSession && current.active_session_id !== payload.sessionId) {
+        res.status(401).json({ error: 'This account is active on another device. Please sign in again.' });
+        return;
+      }
+
+      const body = req.body as Record<string, unknown>;
+      const name = parseOptionalString(body.name);
+      const emailRaw = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+      const phone = parseOptionalString(body.phone);
+      const bio = parseOptionalString(body.bio);
+      const profileImageUrlInput =
+        body.profileImageUrl === null || body.profileImageUrl === ''
+          ? null
+          : parseOptionalString(body.profileImageUrl);
+
+      if (!name || name.length > 200) {
+        res.status(400).json({ error: 'Please enter your name (max 200 characters).' });
+        return;
+      }
+      if (!emailRaw || !EMAIL_RE.test(emailRaw)) {
+        res.status(400).json({ error: 'Please enter a valid email address.' });
+        return;
+      }
+      if (phone && phone.length > 32) {
+        res.status(400).json({ error: 'Phone number is too long.' });
+        return;
+      }
+      if (bio && bio.length > 1500) {
+        res.status(400).json({ error: 'Bio must be 1500 characters or fewer.' });
+        return;
+      }
+      if (profileImageUrlInput) {
+        if (!isAllowedProfileImage(profileImageUrlInput)) {
+          res.status(400).json({ error: 'Profile photo must be a JPG/PNG image or a valid image URL.' });
+          return;
+        }
+        if (profileImageUrlInput.startsWith('data:image/') && profileImageUrlInput.length > 3_000_000) {
+          res.status(400).json({ error: 'Profile photo is too large. Use a JPG or PNG under 2MB.' });
+          return;
+        }
+      }
+
+      const existing = await sql`
+        SELECT id
+        FROM users
+        WHERE email = ${emailRaw}
+          AND id <> ${current.id}
+        LIMIT 1
+      `;
+      if (existing.length > 0) {
+        res.status(409).json({ error: 'An account with this email already exists.' });
+        return;
+      }
+
+      await sql`
+        UPDATE users
+        SET
+          name = ${name},
+          email = ${emailRaw},
+          phone = ${phone},
+          bio = ${bio},
+          profile_image_url = ${profileImageUrlInput}
+        WHERE id = ${current.id}
+      `;
+
+      res.json({
+        profile: {
+          id: current.id,
+          email: emailRaw,
+          name,
+          role: current.role,
+          phone: phone ?? '',
+          bio: bio ?? '',
+          profileImageUrl: profileImageUrlInput,
+        },
+      });
+    } catch (e) {
+      console.error('profile:update', e);
+      res.status(500).json({ error: 'Could not save profile settings.' });
     }
   });
 
