@@ -18,8 +18,21 @@ export type AuthProfile = {
 
 export async function readAuthError(res: Response): Promise<string> {
   try {
-    const data = (await res.json()) as { error?: string };
-    return data.error ?? res.statusText ?? 'Request failed';
+    const text = await res.text();
+    if (!text) {
+      return res.statusText || 'Request failed';
+    }
+
+    try {
+      const data = JSON.parse(text) as { error?: string };
+      if (typeof data.error === 'string' && data.error.trim()) {
+        return data.error;
+      }
+    } catch {
+      // Fall back to the raw response body below.
+    }
+
+    return text.trim() || res.statusText || 'Request failed';
   } catch {
     return res.statusText || 'Request failed';
   }

@@ -1,8 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AUTH_COOKIE_NAME } from '@/lib/auth-cookie';
+import { AUTH_COOKIE_NAME, AUTH_COOKIE_PATH } from '@/lib/auth-cookie';
 import { fetchUpstream } from '@/lib/upstream-fetch';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+async function parseUpstreamJson(
+  res: Response
+): Promise<{ profile?: unknown; error?: string } | null> {
+  try {
+    return (await res.json()) as { profile?: unknown; error?: string };
+  } catch {
+    return null;
+  }
+}
+
+function clearSessionCookie(out: NextResponse): NextResponse {
+  out.cookies.set(AUTH_COOKIE_NAME, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: AUTH_COOKIE_PATH,
+    maxAge: 0,
+  });
+  return out;
+}
 
 export async function GET(req: NextRequest) {
   const token = req.cookies.get(AUTH_COOKIE_NAME)?.value;
@@ -20,7 +42,13 @@ export async function GET(req: NextRequest) {
   }
 
   const res = resOrErr;
-  const data = (await res.json()) as { profile?: unknown; error?: string };
+  const data = await parseUpstreamJson(res);
+  if (!data) {
+    return NextResponse.json({ error: 'Invalid response from auth service' }, { status: 502 });
+  }
+  if (!res.ok && res.status === 401) {
+    return clearSessionCookie(NextResponse.json(data, { status: res.status }));
+  }
   return NextResponse.json(data, { status: res.status });
 }
 
@@ -51,6 +79,12 @@ export async function PATCH(req: NextRequest) {
   }
 
   const res = resOrErr;
-  const data = (await res.json()) as { profile?: unknown; error?: string };
+  const data = await parseUpstreamJson(res);
+  if (!data) {
+    return NextResponse.json({ error: 'Invalid response from auth service' }, { status: 502 });
+  }
+  if (!res.ok && res.status === 401) {
+    return clearSessionCookie(NextResponse.json(data, { status: res.status }));
+  }
   return NextResponse.json(data, { status: res.status });
 }

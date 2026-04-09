@@ -28,7 +28,7 @@ function initialsFromName(fullName: string): string {
 }
 
 export function ProfileSettingsPage() {
-  const { refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [firstName, setFirstName] = useState('');
@@ -72,10 +72,23 @@ export function ProfileSettingsPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+
+    const nameParts = splitName(user.name);
+    setFirstName((current) => current || nameParts.firstName);
+    setLastName((current) => current || nameParts.lastName);
+    setEmail((current) => current || user.email);
+  }, [user]);
+
   const fullName = useMemo(
     () => [firstName.trim(), lastName.trim()].filter(Boolean).join(' ').trim(),
     [firstName, lastName]
   );
+  const fallbackName = profile?.name || user?.name || '';
+  const fallbackEmail = profile?.email || user?.email || '';
+  const fallbackNameParts = useMemo(() => splitName(fallbackName), [fallbackName]);
+  const canRenderForm = !loading || !!user || !!profile;
 
   async function handlePhotoFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -111,11 +124,14 @@ export function ProfileSettingsPage() {
     setError(null);
     setSuccess(null);
 
-    if (!fullName) {
+    const submittedName = fullName || fallbackName.trim();
+    const submittedEmail = (email || fallbackEmail).trim().toLowerCase();
+
+    if (!submittedName) {
       setError('Please enter your name.');
       return;
     }
-    if (!email.trim()) {
+    if (!submittedEmail) {
       setError('Please enter your email address.');
       return;
     }
@@ -123,8 +139,8 @@ export function ProfileSettingsPage() {
     setSubmitting(true);
     try {
       const updated = await patchAuthProfile({
-        name: fullName,
-        email: email.trim().toLowerCase(),
+        name: submittedName,
+        email: submittedEmail,
         phone,
         bio,
         profileImageUrl,
@@ -145,7 +161,7 @@ export function ProfileSettingsPage() {
       <h1 className="mb-8 text-3xl">Profile Settings</h1>
 
       <Card className="max-w-2xl">
-        {loading ? (
+        {!canRenderForm ? (
           <p className="text-slate-600">Loading profile settings...</p>
         ) : (
           <form className="space-y-6" onSubmit={handleSubmit} noValidate>
@@ -168,11 +184,11 @@ export function ProfileSettingsPage() {
                 {profileImageUrl ? (
                   <img
                     src={profileImageUrl}
-                    alt={fullName || profile?.name || 'Profile photo'}
+                    alt={fullName || fallbackName || 'Profile photo'}
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <span>{initialsFromName(fullName || profile?.name || '')}</span>
+                  <span>{initialsFromName(fullName || fallbackName)}</span>
                 )}
               </div>
 
@@ -203,7 +219,7 @@ export function ProfileSettingsPage() {
                 <label className="mb-2 block text-sm">First Name</label>
                 <input
                   type="text"
-                  value={firstName}
+                  value={firstName || fallbackNameParts.firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
                 />
@@ -212,7 +228,7 @@ export function ProfileSettingsPage() {
                 <label className="mb-2 block text-sm">Last Name</label>
                 <input
                   type="text"
-                  value={lastName}
+                  value={lastName || fallbackNameParts.lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
                 />
@@ -223,7 +239,7 @@ export function ProfileSettingsPage() {
               <label className="mb-2 block text-sm">Email</label>
               <input
                 type="email"
-                value={email}
+                value={email || fallbackEmail}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
               />

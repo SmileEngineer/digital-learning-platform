@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Router } from 'express';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import { hasActiveSessionColumn } from '../auth/active-session.js';
-import { getUserProfileColumnAvailability } from '../auth/profile-columns.js';
+import { ensureUserProfileColumns } from '../auth/profile-columns.js';
 import { hashPassword, signUserToken, verifyPassword, verifyUserToken } from '../auth/crypto.js';
 import { parseBearer } from '../auth/request-user.js';
 import { sendPasswordResetEmail } from '../mailer.js';
@@ -283,31 +283,34 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
       }
 
       const canTrackActiveSession = await hasActiveSessionColumn(sql);
-      const profileColumns = await getUserProfileColumnAvailability(sql);
+      const profileColumns = await ensureUserProfileColumns(sql);
       const rows =
-        canTrackActiveSession && profileColumns.bio && profileColumns.profileImageUrl
+        canTrackActiveSession &&
+        profileColumns.phone &&
+        profileColumns.bio &&
+        profileColumns.profileImageUrl
           ? await sql`
-              SELECT id, email, name, role, phone, bio, profile_image_url, active_session_id
+              SELECT id, email, name, phone, bio, profile_image_url, active_session_id
               FROM users
               WHERE id = ${payload.sub}
               LIMIT 1
             `
           : canTrackActiveSession
             ? await sql`
-                SELECT id, email, name, role, phone, active_session_id
+                SELECT id, email, name, active_session_id
                 FROM users
                 WHERE id = ${payload.sub}
                 LIMIT 1
               `
-            : profileColumns.bio && profileColumns.profileImageUrl
+            : profileColumns.phone && profileColumns.bio && profileColumns.profileImageUrl
               ? await sql`
-                  SELECT id, email, name, role, phone, bio, profile_image_url
+                  SELECT id, email, name, phone, bio, profile_image_url
                   FROM users
                   WHERE id = ${payload.sub}
                   LIMIT 1
                 `
               : await sql`
-                  SELECT id, email, name, role, phone
+                  SELECT id, email, name
                   FROM users
                   WHERE id = ${payload.sub}
                   LIMIT 1
@@ -322,7 +325,6 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
         id: string;
         email: string;
         name: string;
-        role: 'student' | 'admin' | 'staff' | 'super_admin';
         phone: string | null;
         bio?: string | null;
         profile_image_url?: string | null;
@@ -339,8 +341,8 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role,
-          phone: user.phone ?? '',
+          role: payload.role,
+          phone: profileColumns.phone ? (user.phone ?? '') : '',
           bio: profileColumns.bio ? (user.bio ?? '') : '',
           profileImageUrl: profileColumns.profileImageUrl ? (user.profile_image_url ?? null) : null,
         },
@@ -365,22 +367,18 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
         return;
       }
 
-      const profileColumns = await getUserProfileColumnAvailability(sql);
-      if (!profileColumns.bio || !profileColumns.profileImageUrl) {
-        res.status(503).json({ error: 'Profile settings storage is not ready. Run the latest database migrations.' });
-        return;
-      }
+      const profileColumns = await ensureUserProfileColumns(sql);
 
       const canTrackActiveSession = await hasActiveSessionColumn(sql);
       const rows = canTrackActiveSession
         ? await sql`
-            SELECT id, role, active_session_id
+            SELECT id, active_session_id
             FROM users
             WHERE id = ${payload.sub}
             LIMIT 1
           `
         : await sql`
-            SELECT id, role
+            SELECT id
             FROM users
             WHERE id = ${payload.sub}
             LIMIT 1
@@ -393,7 +391,6 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
 
       const current = rows[0] as {
         id: string;
-        role: 'student' | 'admin' | 'staff' | 'super_admin';
         active_session_id?: string | null;
       };
 
@@ -405,10 +402,12 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
       const body = req.body as Record<string, unknown>;
       const name = parseOptionalString(body.name);
       const emailRaw = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
-      const phone = parseOptionalString(body.phone);
-      const bio = parseOptionalString(body.bio);
+      const phone = profileColumns.phone ? parseOptionalString(body.phone) : null;
+      const bio = profileColumns.bio ? parseOptionalString(body.bio) : null;
       const profileImageUrlInput =
-        body.profileImageUrl === null || body.profileImageUrl === ''
+        !profileColumns.profileImageUrl
+          ? null
+          : body.profileImageUrl === null || body.profileImageUrl === ''
           ? null
           : parseOptionalString(body.profileImageUrl);
 
@@ -439,6 +438,18 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
         }
       }
 
+      const requestedUnavailableFields = [
+        !profileColumns.phone && typeof body.phone === 'string' && body.phone.trim() !== '' ? 'phone' : null,
+        !profileColumns.bio && typeof body.bio === 'string' && body.bio.trim() !== '' ? 'bio' : null,
+        !profileColumns.profileImageUrl && body.profileImageUrl !== null && body.profileImageUrl !== '' ? 'photo' : null,
+      ].filter(Boolean);
+      if (requestedUnavailableFields.length > 0) {
+        res.status(503).json({
+          error: `Profile storage is not ready for ${requestedUnavailableFields.join(', ')}. Run the latest database migrations and restart the API.`,
+        });
+        return;
+      }
+
       const existing = await sql`
         SELECT id
         FROM users
@@ -451,23 +462,42 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
         return;
       }
 
-      await sql`
-        UPDATE users
-        SET
-          name = ${name},
-          email = ${emailRaw},
-          phone = ${phone},
-          bio = ${bio},
-          profile_image_url = ${profileImageUrlInput}
-        WHERE id = ${current.id}
-      `;
+      if (profileColumns.phone && profileColumns.bio && profileColumns.profileImageUrl) {
+        await sql`
+          UPDATE users
+          SET
+            name = ${name},
+            email = ${emailRaw},
+            phone = ${phone},
+            bio = ${bio},
+            profile_image_url = ${profileImageUrlInput}
+          WHERE id = ${current.id}
+        `;
+      } else if (profileColumns.phone) {
+        await sql`
+          UPDATE users
+          SET
+            name = ${name},
+            email = ${emailRaw},
+            phone = ${phone}
+          WHERE id = ${current.id}
+        `;
+      } else {
+        await sql`
+          UPDATE users
+          SET
+            name = ${name},
+            email = ${emailRaw}
+          WHERE id = ${current.id}
+        `;
+      }
 
       res.json({
         profile: {
           id: current.id,
           email: emailRaw,
           name,
-          role: current.role,
+          role: payload.role,
           phone: phone ?? '',
           bio: bio ?? '',
           profileImageUrl: profileImageUrlInput,
