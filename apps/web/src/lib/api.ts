@@ -50,6 +50,18 @@ export async function postAuthRegister(
   });
 }
 
+export async function postAuthChangePassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<Response> {
+  return fetch('/api/auth/change-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
 export async function postAuthLogout(): Promise<Response> {
   return fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
 }

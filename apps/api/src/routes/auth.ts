@@ -142,6 +142,118 @@ export function createAuthRouter(sql: NeonQueryFunction<false, false>): Router {
     }
   });
 
+  router.post('/change-password', async (req, res) => {
+    try {
+      const token = parseBearer(req);
+      if (!token) {
+        res.status(401).json({ error: 'Not signed in.' });
+        return;
+      }
+
+      const payload = verifyUserToken(token);
+      if (!payload) {
+        res.status(401).json({ error: 'Session expired. Please sign in again.' });
+        return;
+      }
+
+      const body = req.body as Record<string, unknown>;
+      const currentPassword = typeof body.currentPassword === 'string' ? body.currentPassword : '';
+      const newPassword = typeof body.newPassword === 'string' ? body.newPassword : '';
+
+      if (!currentPassword || !newPassword) {
+        res.status(400).json({ error: 'Current password and new password are required.' });
+        return;
+      }
+      if (newPassword.length < 8) {
+        res.status(400).json({ error: 'Password must be at least 8 characters.' });
+        return;
+      }
+      if (newPassword.length > 256) {
+        res.status(400).json({ error: 'Password is too long.' });
+        return;
+      }
+      if (currentPassword === newPassword) {
+        res.status(400).json({ error: 'New password must be different from the current password.' });
+        return;
+      }
+
+      const canTrackActiveSession = await hasActiveSessionColumn(sql);
+      const rows = canTrackActiveSession
+        ? await sql`
+            SELECT id, email, name, role, admin_permissions, password_hash, active_session_id
+            FROM users
+            WHERE id = ${payload.sub}
+            LIMIT 1
+          `
+        : await sql`
+            SELECT id, email, name, role, admin_permissions, password_hash
+            FROM users
+            WHERE id = ${payload.sub}
+            LIMIT 1
+          `;
+
+      if (rows.length === 0) {
+        res.status(401).json({ error: 'Account not found.' });
+        return;
+      }
+
+      const user = rows[0] as {
+        id: string;
+        email: string;
+        name: string;
+        role: 'student' | 'admin' | 'staff' | 'super_admin';
+        admin_permissions: string[];
+        password_hash: string;
+        active_session_id: string | null;
+      };
+
+      if (canTrackActiveSession && user.active_session_id !== payload.sessionId) {
+        res.status(401).json({ error: 'This account is active on another device. Please sign in again.' });
+        return;
+      }
+
+      const currentOk = await verifyPassword(currentPassword, user.password_hash);
+      if (!currentOk) {
+        res.status(400).json({ error: 'Current password is incorrect.' });
+        return;
+      }
+
+      const passwordHash = await hashPassword(newPassword);
+      const sessionId = randomBytes(32).toString('hex');
+
+      if (canTrackActiveSession) {
+        await sql`
+          UPDATE users
+          SET password_hash = ${passwordHash},
+              active_session_id = ${sessionId}
+          WHERE id = ${user.id}
+        `;
+      } else {
+        await sql`
+          UPDATE users
+          SET password_hash = ${passwordHash}
+          WHERE id = ${user.id}
+        `;
+      }
+
+      const nextToken = signUserToken(user.id, user.email, user.name, user.role, sessionId);
+      res.json({
+        ok: true,
+        token: nextToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          adminPermissions: user.admin_permissions ?? [],
+        },
+      });
+    } catch (e) {
+      console.error('change-password', e);
+      res.status(500).json({ error: 'Could not update password.' });
+    }
+  });
+
   router.post('/forgot-password', async (req, res) => {
     try {
       const body = req.body as Record<string, unknown>;
