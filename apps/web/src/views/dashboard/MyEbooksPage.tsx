@@ -40,6 +40,10 @@ export function MyEbooksPage() {
         payload.downloadConfirmationMessage ??
         'This eBook will be exported with your watermark on every page. Continue?';
       if (!window.confirm(message)) return;
+      if (payload.pdfUrl) {
+        window.open(payload.pdfUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
       const qr = await buildQrCodeDataUrl(payload.qrValue);
       const html = createWatermarkedEbookHtml({
         title: payload.item.title,

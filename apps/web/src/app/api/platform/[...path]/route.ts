@@ -16,7 +16,14 @@ async function proxy(req: NextRequest, params: Promise<Params>) {
   if (contentType) headers['Content-Type'] = contentType;
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const body = req.method === 'GET' || req.method === 'HEAD' ? undefined : await req.text();
+  let body: BodyInit | undefined;
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    body = undefined;
+  } else if (contentType?.includes('multipart/form-data')) {
+    body = await req.arrayBuffer();
+  } else {
+    body = await req.text();
+  }
   const resOrErr = await fetchUpstream(upstreamPath, {
     method: req.method,
     headers,

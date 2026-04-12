@@ -6,6 +6,9 @@ node_modules/
 .env.local
 .env.*.local
 
+# API local ebook PDF uploads (dev / self-hosted; path matches src/index.ts)
+apps/api/src/uploads/
+
 # Build / output
 dist/
 .next/

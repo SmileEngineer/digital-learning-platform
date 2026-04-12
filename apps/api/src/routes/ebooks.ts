@@ -1,4 +1,7 @@
+import { randomUUID } from 'node:crypto';
+import path from 'node:path';
 import { Router } from 'express';
+import multer from 'multer';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import { mapCatalogItem, type CatalogItemRow } from '../platform.js';
 import { requireAdminPermission, requireSessionUser } from '../auth/session.js';
@@ -23,12 +26,14 @@ type EbookWriteInput = {
   status: 'draft' | 'published';
   tags: string[];
   downloadConfirmationMessage: string | null;
+  pdfUrl: string | null;
   pageContents: EbookPageInput[];
 };
 
 type EbookMetadata = {
   pageContents: EbookPageInput[];
   downloadConfirmationMessage: string | null;
+  pdfUrl: string | null;
   readerProtection: {
     disableRightClick: boolean;
     blockDevtoolsShortcuts: boolean;
@@ -47,6 +52,21 @@ function parseOptionalString(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   return trimmed || null;
+}
+
+function parsePdfUrl(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  try {
+    const u = new URL(trimmed);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+  } catch {
+    return null;
+  }
+  if (trimmed.length > 2048) return null;
+  return trimmed;
 }
 
 function parsePositiveMoney(value: unknown): number | null {
@@ -123,6 +143,7 @@ function parseMetadata(metadata: Record<string, unknown> | null): EbookMetadata 
     pageContents,
     downloadConfirmationMessage:
       typeof meta.downloadConfirmationMessage === 'string' ? meta.downloadConfirmationMessage : null,
+    pdfUrl: parsePdfUrl(meta.pdfUrl),
     readerProtection: {
       disableRightClick:
         typeof protection.disableRightClick === 'boolean' ? protection.disableRightClick : true,
@@ -148,6 +169,7 @@ function toAdminEbook(row: EbookAdminRow) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     downloadConfirmationMessage: metadata.downloadConfirmationMessage,
+    pdfUrl: metadata.pdfUrl,
     pageContents: metadata.pageContents.map((page, index) => ({
       pageNumber: index + 1,
       ...page,
@@ -162,6 +184,7 @@ function toReaderResponse(
     hasAccess: boolean;
     watermarkText: string;
     qrValue: string | null;
+    exposePdfUrl: boolean;
   }
 ) {
   const pages = (options.hasAccess ? metadata.pageContents : metadata.pageContents.slice(0, Math.max(1, row.preview_count))).map(
@@ -220,6 +243,8 @@ function parseEbookInput(body: Record<string, unknown>): { data?: EbookWriteInpu
     return { error: 'Preview pages cannot exceed the total number of ebook pages.' };
   }
 
+  const pdfUrl = parsePdfUrl(body.pdfUrl);
+
   return {
     data: {
       slug,
@@ -235,6 +260,7 @@ function parseEbookInput(body: Record<string, unknown>): { data?: EbookWriteInpu
       status,
       tags: parseTags(body.tags),
       downloadConfirmationMessage: parseOptionalString(body.downloadConfirmationMessage),
+      pdfUrl,
       pageContents: parsedPages.pages,
     },
   };
@@ -294,8 +320,28 @@ async function getEbookBySlug(
   return rows[0] ?? null;
 }
 
-export function createAdminEbooksRouter(sql: NeonQueryFunction<false, false>): Router {
+export function createAdminEbooksRouter(sql: NeonQueryFunction<false, false>, ebookUploadsDir: string): Router {
   const router = Router();
+
+  const storage = multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      cb(null, ebookUploadsDir);
+    },
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `${randomUUID()}${ext === '.pdf' ? ext : '.pdf'}`);
+    },
+  });
+  const uploadPdf = multer({
+    storage,
+    limits: { fileSize: 40 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const okMime = file.mimetype === 'application/pdf';
+      const okName = file.originalname.toLowerCase().endsWith('.pdf');
+      if (okMime || okName) cb(null, true);
+      else cb(new Error('Only PDF files are allowed'));
+    },
+  });
 
   router.get('/ebooks', async (req, res) => {
     try {
@@ -308,6 +354,42 @@ export function createAdminEbooksRouter(sql: NeonQueryFunction<false, false>): R
       res.status(500).json({ error: 'Could not load ebooks.' });
     }
   });
+
+  router.post(
+    '/ebooks/upload-pdf',
+    async (req, res, next) => {
+      const user = await requireAdminPermission(req, res, sql, 'ebooks');
+      if (!user) return;
+      next();
+    },
+    (req, res, next) => {
+      uploadPdf.single('file')(req, res, (err: unknown) => {
+        if (err) {
+          const message = err instanceof Error ? err.message : 'Upload failed';
+          res.status(400).json({ error: message });
+          return;
+        }
+        next();
+      });
+    },
+    (req, res) => {
+      try {
+        const file = (req as { file?: { filename: string } }).file;
+        if (!file) {
+          res.status(400).json({ error: 'Missing PDF file (form field name: file).' });
+          return;
+        }
+        const base =
+          (process.env.PUBLIC_API_URL && process.env.PUBLIC_API_URL.replace(/\/$/, '')) ||
+          `${req.protocol}://${req.get('host')}`;
+        const url = `${base}/static/ebooks/${file.filename}`;
+        res.json({ url });
+      } catch (e) {
+        console.error('admin.ebooks:upload', e);
+        res.status(500).json({ error: 'Could not upload PDF.' });
+      }
+    }
+  );
 
   router.get('/ebooks/:id', async (req, res) => {
     try {
@@ -338,6 +420,7 @@ export function createAdminEbooksRouter(sql: NeonQueryFunction<false, false>): R
       const metadata: EbookMetadata = {
         pageContents: input.pageContents,
         downloadConfirmationMessage: input.downloadConfirmationMessage,
+        pdfUrl: input.pdfUrl,
         readerProtection: {
           disableRightClick: true,
           blockDevtoolsShortcuts: true,
@@ -414,6 +497,7 @@ export function createAdminEbooksRouter(sql: NeonQueryFunction<false, false>): R
       const metadata: EbookMetadata = {
         pageContents: input.pageContents,
         downloadConfirmationMessage: input.downloadConfirmationMessage,
+        pdfUrl: input.pdfUrl,
         readerProtection: {
           disableRightClick: true,
           blockDevtoolsShortcuts: true,
@@ -470,6 +554,7 @@ export function createCatalogEbooksRouter(sql: NeonQueryFunction<false, false>):
           hasAccess: false,
           watermarkText: 'Preview Only',
           qrValue: null,
+          exposePdfUrl: false,
         })
       );
     } catch (e) {
@@ -523,6 +608,7 @@ export function createLearnerEbooksRouter(sql: NeonQueryFunction<false, false>):
           hasAccess: true,
           watermarkText,
           qrValue: phone ?? user.email,
+          exposePdfUrl: true,
         })
       );
     } catch (e) {
@@ -562,13 +648,15 @@ export function createLearnerEbooksRouter(sql: NeonQueryFunction<false, false>):
       const phone = user.phone;
       const watermarkText = phone ? `${user.name} • ${phone}` : `${user.name} • ${user.email}`;
       const metadata = parseMetadata(item.metadata);
+      const readerPayload = toReaderResponse(item, metadata, {
+        hasAccess: true,
+        watermarkText,
+        qrValue: phone ?? user.email,
+        exposePdfUrl: true,
+      });
       res.json({
-        filename: `${item.slug}.html`,
-        ...toReaderResponse(item, metadata, {
-          hasAccess: true,
-          watermarkText,
-          qrValue: phone ?? user.email,
-        }),
+        filename: metadata.pdfUrl ? `${item.slug}.pdf` : `${item.slug}.html`,
+        ...readerPayload,
       });
     } catch (e) {
       console.error('learner.ebooks.download', e);

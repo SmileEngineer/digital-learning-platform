@@ -11,6 +11,7 @@ import {
   fetchAdminEbook,
   fetchAdminEbooks,
   updateAdminEbook,
+  uploadAdminEbookPdf,
   type AdminEbook,
   type AdminEbookInput,
 } from '@/lib/platform-api';
@@ -26,6 +27,7 @@ type FormState = {
   slug: string;
   description: string;
   imageUrl: string;
+  pdfUrl: string;
   price: string;
   authorName: string;
   category: string;
@@ -52,6 +54,7 @@ function createEmptyForm(defaultCategory = 'eBooks'): FormState {
     slug: '',
     description: '',
     imageUrl: '',
+    pdfUrl: '',
     price: '0',
     authorName: '',
     category: defaultCategory,
@@ -72,6 +75,7 @@ function toFormState(item: AdminEbook): FormState {
     slug: item.slug,
     description: item.description,
     imageUrl: item.image,
+    pdfUrl: item.pdfUrl ?? '',
     price: String(item.price),
     authorName: item.author ?? item.instructor,
     category: item.category ?? 'eBooks',
@@ -98,6 +102,7 @@ function toPayload(form: FormState): AdminEbookInput {
     title: form.title.trim(),
     description: form.description.trim(),
     imageUrl: form.imageUrl.trim(),
+    pdfUrl: form.pdfUrl.trim() || null,
     price: Number(form.price),
     authorName: form.authorName.trim(),
     category: form.category.trim(),
@@ -130,6 +135,7 @@ export function ManageEbooksPage() {
   const [submitting, setSubmitting] = useState(false);
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
 
   async function loadItems() {
     try {
@@ -212,6 +218,23 @@ export function ManageEbooksPage() {
     setMessage(null);
     setError(null);
     setEditorOpen(true);
+  }
+
+  async function handlePdfFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      setUploadingPdf(true);
+      setError(null);
+      const { url } = await uploadAdminEbookPdf(file);
+      setForm((current) => ({ ...current, pdfUrl: url }));
+      setMessage('PDF uploaded. The URL field was updated — save the eBook to keep it.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not upload PDF.');
+    } finally {
+      setUploadingPdf(false);
+    }
   }
 
   return (
@@ -401,6 +424,36 @@ export function ManageEbooksPage() {
                   className="w-full rounded-lg border border-slate-300 px-3 py-2"
                 />
               </label>
+            </div>
+
+            <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+              <h3 className="text-lg font-medium text-slate-900">PDF file (optional)</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                If set, purchasers download this PDF instead of the watermarked HTML export. Paste a public HTTPS link, or
+                upload a PDF to store it on the API. In production, set PUBLIC_API_URL on the API so generated links use
+                your public hostname.
+              </p>
+              <label className="mt-4 block">
+                <span className="mb-2 block text-sm text-slate-700">PDF URL</span>
+                <input
+                  value={form.pdfUrl}
+                  onChange={(e) => setForm((current) => ({ ...current, pdfUrl: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                  placeholder="https://cdn.example.com/ebooks/sample.pdf"
+                />
+              </label>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    className="text-sm file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1.5"
+                    disabled={uploadingPdf}
+                    onChange={handlePdfFileSelected}
+                  />
+                </label>
+                {uploadingPdf ? <span className="text-sm text-slate-600">Uploading…</span> : null}
+              </div>
             </div>
 
             <div className="mt-8">

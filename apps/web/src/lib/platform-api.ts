@@ -84,6 +84,8 @@ export type EbookReaderData = {
   qrValue: string | null;
   downloadAllowed: boolean;
   downloadConfirmationMessage: string | null;
+  /** Present for entitled users when admin set a PDF URL; use instead of HTML export. */
+  pdfUrl?: string | null;
   protection: {
     disableRightClick: boolean;
     blockDevtoolsShortcuts: boolean;
@@ -97,6 +99,8 @@ export type AdminEbook = CatalogItem & {
   createdAt: string;
   updatedAt: string;
   downloadConfirmationMessage: string | null;
+  /** Optional HTTPS (or API-hosted) PDF for purchaser download; otherwise export is watermarked HTML. */
+  pdfUrl?: string | null;
   pageContents: EbookReaderPage[];
 };
 
@@ -114,6 +118,8 @@ export type AdminEbookInput = {
   status: 'draft' | 'published';
   tags: string[];
   downloadConfirmationMessage: string | null;
+  /** Public PDF URL (https) or URL from “Upload PDF” on the API. Omit or null to use HTML export only. */
+  pdfUrl?: string | null;
   pageContents: Array<{
     title: string;
     body: string;
@@ -981,6 +987,18 @@ export async function createAdminEbook(input: AdminEbookInput): Promise<AdminEbo
 export async function updateAdminEbook(id: string, input: AdminEbookInput): Promise<AdminEbook> {
   const data = await patchJson<{ item: AdminEbook }>(`/api/platform/admin/ebooks/${encodeURIComponent(id)}`, input);
   return data.item;
+}
+
+export async function uploadAdminEbookPdf(file: File): Promise<{ url: string }> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch('/api/platform/admin/ebooks/upload-pdf', {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return (await res.json()) as { url: string };
 }
 
 export async function createAdminLiveClass(input: AdminLiveClassInput): Promise<AdminLiveClass> {

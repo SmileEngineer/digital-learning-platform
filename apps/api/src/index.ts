@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import './load-env.js';
 import cors from 'cors';
 import express from 'express';
@@ -42,6 +45,11 @@ app.use(
 app.use(express.json({ limit: '5mb' }));
 
 const dbUrl = process.env.DATABASE_URL;
+const apiRoot = path.dirname(fileURLToPath(import.meta.url));
+const ebookUploadsDir = path.join(apiRoot, 'uploads', 'ebooks');
+fs.mkdirSync(ebookUploadsDir, { recursive: true });
+app.use('/static/ebooks', express.static(ebookUploadsDir));
+
 if (dbUrl) {
   const sql = neon(dbUrl);
   app.use('/auth', createAuthRouter(sql));
@@ -50,7 +58,7 @@ if (dbUrl) {
   app.use('/admin', createAdminCoursesRouter(sql));
   app.use('/admin', createAdminToolsRouter(sql));
   app.use('/admin', createAdminBooksRouter(sql));
-  app.use('/admin', createAdminEbooksRouter(sql));
+  app.use('/admin', createAdminEbooksRouter(sql, ebookUploadsDir));
   app.use('/admin', createAdminLiveClassesRouter(sql));
   app.use('/admin', createAdminPracticeExamsRouter(sql));
   app.use('/catalog', createCatalogRouter(sql));
