@@ -1,3 +1,9 @@
+import type {
+  HomeBannerContent,
+  SiteModuleCategoryConfig,
+  SiteNavigationConfig,
+} from '@/lib/site-config-defaults';
+
 export type CatalogItemType =
   | 'course'
   | 'ebook'
@@ -292,6 +298,19 @@ export type AdminAnalyticsSummary = {
 export type SiteSettings = {
   homeScrollerEnabled: boolean;
   homeScrollerMessage: string;
+  homeBanner: HomeBannerContent;
+  navigation: SiteNavigationConfig;
+  moduleCategories: SiteModuleCategoryConfig;
+};
+
+export type PublicSiteConfig = {
+  scroller: {
+    enabled: boolean;
+    message: string;
+  };
+  homeBanner: HomeBannerContent;
+  navigation: SiteNavigationConfig;
+  moduleCategories: SiteModuleCategoryConfig;
 };
 
 export type AdminUserAccess = {
@@ -436,6 +455,7 @@ export type HomeHighlights = {
     enabled: boolean;
     message: string;
   };
+  homeBanner: HomeBannerContent;
 };
 
 export type CheckoutQuote = {
@@ -582,6 +602,10 @@ const CATALOG_LIST_CACHE_MS = 60_000;
 
 export async function fetchHomeHighlights(): Promise<HomeHighlights> {
   return getJson<HomeHighlights>('/api/platform/catalog/highlights');
+}
+
+export async function fetchPublicSiteConfig(): Promise<PublicSiteConfig> {
+  return getJson<PublicSiteConfig>('/api/platform/catalog/site-config');
 }
 
 export async function fetchCatalogItems(type: CatalogItemType): Promise<CatalogItem[]> {

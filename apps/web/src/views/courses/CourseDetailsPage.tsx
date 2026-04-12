@@ -8,7 +8,6 @@ import {
   Clock,
   Globe,
   PlayCircle,
-  Shield,
   Signal,
 } from 'lucide-react';
 import { Badge } from '@/components/Badge';
@@ -25,6 +24,9 @@ import {
 import { formatRupees } from '@/lib/price';
 
 function accessLabel(course: CourseDetail): string {
+  if (course.accessType === 'fixed_date' && course.accessFixedDate) {
+    return `Access until ${new Date(course.accessFixedDate).toLocaleDateString()}`;
+  }
   if (course.accessType === 'fixed_months' && course.accessMonths) {
     return `${course.accessMonths} months access`;
   }
@@ -32,7 +34,83 @@ function accessLabel(course: CourseDetail): string {
 }
 
 function isEmbedUrl(url: string): boolean {
-  return /youtube|youtu\.be|vimeo|loom|embed/i.test(url);
+  return /youtube|youtu\.be|vimeo|loom|embed|drive\.google\.com/i.test(url);
+}
+
+function normalizeVideoUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return trimmed;
+
+  let parsedUrl: URL | null = null;
+  try {
+    parsedUrl = new URL(trimmed);
+  } catch {
+    parsedUrl = null;
+  }
+
+  if (parsedUrl) {
+    const hostname = parsedUrl.hostname.toLowerCase();
+
+    if (hostname.includes('youtube.com') || hostname === 'youtu.be') {
+      const videoId =
+        parsedUrl.searchParams.get('v') ||
+        parsedUrl.pathname.split('/').filter(Boolean).pop();
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}`;
+      }
+    }
+
+    if (hostname.includes('vimeo.com')) {
+      const videoId = parsedUrl.pathname.split('/').filter(Boolean).pop();
+      if (videoId) {
+        return `https://player.vimeo.com/video/${videoId}`;
+      }
+    }
+
+    if (hostname.includes('loom.com')) {
+      const loomId = parsedUrl.pathname.split('/').filter(Boolean).pop();
+      if (loomId) {
+        return `https://www.loom.com/embed/${loomId}`;
+      }
+    }
+
+    if (hostname.includes('drive.google.com')) {
+      const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
+      const fileIndex = pathParts.findIndex((part) => part === 'd');
+      const fileId =
+        (fileIndex >= 0 ? pathParts[fileIndex + 1] : null) ??
+        parsedUrl.searchParams.get('id');
+      if (fileId) {
+        return `https://drive.google.com/file/d/${fileId}/preview`;
+      }
+    }
+  }
+
+  const youtubeMatch =
+    trimmed.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{6,})/i) ??
+    trimmed.match(/youtube\.com\/embed\/([\w-]{6,})/i);
+  if (youtubeMatch?.[1]) {
+    return `https://www.youtube.com/embed/${youtubeMatch[1]}`;
+  }
+
+  const vimeoMatch =
+    trimmed.match(/vimeo\.com\/(?:video\/)?(\d+)/i) ??
+    trimmed.match(/player\.vimeo\.com\/video\/(\d+)/i);
+  if (vimeoMatch?.[1]) {
+    return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+  }
+
+  const loomMatch = trimmed.match(/loom\.com\/share\/([a-z0-9]+)/i);
+  if (loomMatch?.[1]) {
+    return `https://www.loom.com/embed/${loomMatch[1]}`;
+  }
+
+  const googleDriveMatch = trimmed.match(/drive\.google\.com\/file\/d\/([^/]+)/i);
+  if (googleDriveMatch?.[1]) {
+    return `https://drive.google.com/file/d/${googleDriveMatch[1]}/preview`;
+  }
+
+  return trimmed;
 }
 
 export function CourseDetailsPage() {
@@ -49,7 +127,9 @@ export function CourseDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedLectureId, setSelectedLectureId] = useState<string | null>(null);
+  const [courseImageError, setCourseImageError] = useState(false);
   const lastTrackedLectureId = useRef<string | null>(null);
+  const playerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -160,6 +240,7 @@ export function CourseDetailsPage() {
 
   function selectLecture(lectureId: string) {
     setSelectedLectureId(lectureId);
+    playerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (!slug) return;
     router.replace(`/courses/${slug}?lecture=${encodeURIComponent(lectureId)}`, { scroll: false });
   }
@@ -192,6 +273,8 @@ export function CourseDetailsPage() {
     );
   }
 
+  const courseImageSrc = courseImageError || !course.imageUrl ? '/images/logo.png' : course.imageUrl;
+
   return (
     <div className="py-8">
       <div className="container mx-auto px-4">
@@ -223,22 +306,24 @@ export function CourseDetailsPage() {
             </div>
 
             <div className="mb-8">
-              <img
-                src={course.imageUrl}
-                alt={course.title}
-                className="w-full h-96 object-cover rounded-lg"
-              />
+              <div className="flex h-96 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-100 p-4">
+                <img
+                  src={courseImageSrc}
+                  alt={course.title}
+                  className="h-full w-full object-contain"
+                  onError={() => setCourseImageError(true)}
+                />
+              </div>
             </div>
 
+            <div ref={playerRef}>
             <Card className="mb-8">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="text-2xl">Course Player</h2>
-                  <p className="text-slate-600 mt-1">
-                    {course.hasAccess
-                      ? 'Your purchased lectures are unlocked below.'
-                      : 'Preview lectures can be watched before purchase.'}
-                  </p>
+                  {course.hasAccess ? (
+                    <p className="mt-1 text-slate-600">Your purchased lectures are unlocked below.</p>
+                  ) : null}
                 </div>
                 {course.accessExpiresAt && (
                   <Badge variant="warning">
@@ -258,7 +343,8 @@ export function CourseDetailsPage() {
                 <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-950">
                   {isEmbedUrl(selectedLecture.videoUrl) ? (
                     <iframe
-                      src={selectedLecture.videoUrl}
+                      key={selectedLecture.id}
+                      src={normalizeVideoUrl(selectedLecture.videoUrl)}
                       title={selectedLecture.title}
                       className="h-96 w-full"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -266,6 +352,7 @@ export function CourseDetailsPage() {
                     />
                   ) : (
                     <video
+                      key={selectedLecture.id}
                       src={selectedLecture.videoUrl}
                       controls
                       controlsList="nodownload"
@@ -300,6 +387,7 @@ export function CourseDetailsPage() {
                 </div>
               )}
             </Card>
+            </div>
 
             <Card className="mb-8">
               <h2 className="text-2xl mb-4">What you&apos;ll learn</h2>
@@ -460,11 +548,11 @@ export function CourseDetailsPage() {
                   Go to Checkout
                 </Button>
 
-                <div className="text-center text-sm text-slate-600 mb-6">
-                  {course.hasAccess
-                    ? 'Full curriculum unlocked for your account.'
-                    : 'Preview lectures available before purchase.'}
-                </div>
+                {course.hasAccess ? (
+                  <div className="mb-6 text-center text-sm text-slate-600">
+                    Full curriculum unlocked for your account.
+                  </div>
+                ) : null}
 
                 <div className="space-y-3 border-t border-slate-200 pt-6">
                   <h3 className="mb-3">This course includes:</h3>
@@ -473,16 +561,12 @@ export function CourseDetailsPage() {
                     <span>{course.durationText} of guided learning</span>
                   </div>
                   <div className="flex items-center gap-3 text-sm">
-                    <Shield className="w-5 h-5 text-slate-400" />
-                    <span>Preview-first access control with video URLs hidden for locked lectures</span>
+                    <Globe className="w-5 h-5 text-slate-400" />
+                    <span>Access on desktop and mobile</span>
                   </div>
                   <div className="flex items-center gap-3 text-sm">
                     <Award className="w-5 h-5 text-slate-400" />
                     <span>Instructor-managed curriculum</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-sm">
-                    <Globe className="w-5 h-5 text-slate-400" />
-                    <span>Access on desktop and mobile</span>
                   </div>
                   <div className="flex items-center gap-3 text-sm">
                     <Signal className="w-5 h-5 text-slate-400" />

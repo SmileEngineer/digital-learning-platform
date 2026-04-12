@@ -134,12 +134,12 @@ export function matchesBrowseSelection(
   base: BrowseBase = '/courses'
 ): boolean {
   if (selection.state) {
-    const stateLabel = labelForState(selection.state, base).toLowerCase();
+    const stateLabel = normalizeName(labelForState(selection.state, base));
     if (normalizeName(item.stateName) !== stateLabel) return false;
   }
 
   if (selection.university) {
-    const universityLabel = labelForUniversity(selection.state, selection.university, base).toLowerCase();
+    const universityLabel = normalizeName(labelForUniversity(selection.state, selection.university, base));
     if (normalizeName(item.universityName) !== universityLabel) return false;
   }
 

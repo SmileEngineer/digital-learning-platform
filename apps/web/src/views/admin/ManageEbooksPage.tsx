@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Edit, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
-import { Card } from '../../components/Card';
 import { AdminNotice, AdminPageHeader, AdminSectionCard } from '@/components/AdminPageChrome';
+import { useModuleCategories } from '@/contexts/SiteConfigContext';
 import {
   createAdminEbook,
   fetchAdminEbook,
@@ -46,7 +46,7 @@ function emptyPage(): PageFormState {
   };
 }
 
-function createEmptyForm(): FormState {
+function createEmptyForm(defaultCategory = 'eBooks'): FormState {
   return {
     title: '',
     slug: '',
@@ -54,7 +54,7 @@ function createEmptyForm(): FormState {
     imageUrl: '',
     price: '0',
     authorName: '',
-    category: 'eBooks',
+    category: defaultCategory,
     fileFormat: 'PDF',
     previewCount: '1',
     downloadEnabled: true,
@@ -119,14 +119,17 @@ function toPayload(form: FormState): AdminEbookInput {
 }
 
 export function ManageEbooksPage() {
+  const moduleCategories = useModuleCategories();
+  const categoryOptions = moduleCategories.ebook.length > 0 ? moduleCategories.ebook : ['eBooks'];
   const [items, setItems] = useState<AdminEbook[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(createEmptyForm);
+  const [form, setForm] = useState<FormState>(() => createEmptyForm(categoryOptions[0] ?? 'eBooks'));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
 
   async function loadItems() {
     try {
@@ -149,6 +152,19 @@ export function ManageEbooksPage() {
     () => [...items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     [items]
   );
+  const availableCategoryOptions = useMemo(
+    () =>
+      form.category && !categoryOptions.includes(form.category)
+        ? [form.category, ...categoryOptions]
+        : categoryOptions,
+    [categoryOptions, form.category]
+  );
+
+  useEffect(() => {
+    if (!form.category && categoryOptions.length > 0) {
+      setForm((current) => ({ ...current, category: categoryOptions[0] }));
+    }
+  }, [categoryOptions, form.category]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -165,6 +181,7 @@ export function ManageEbooksPage() {
       });
       setEditingId(saved.id);
       setForm(toFormState(saved));
+      setEditorOpen(true);
       setMessage(editingId ? 'eBook updated successfully.' : 'eBook created successfully.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save eBook.');
@@ -180,6 +197,7 @@ export function ManageEbooksPage() {
       const item = await fetchAdminEbook(id);
       setEditingId(item.id);
       setForm(toFormState(item));
+      setEditorOpen(true);
       setMessage(`Editing "${item.title}"`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load ebook details.');
@@ -190,9 +208,10 @@ export function ManageEbooksPage() {
 
   function startCreate() {
     setEditingId(null);
-    setForm(createEmptyForm());
+    setForm(createEmptyForm(categoryOptions[0] ?? 'eBooks'));
     setMessage(null);
     setError(null);
+    setEditorOpen(true);
   }
 
   return (
@@ -214,7 +233,7 @@ export function ManageEbooksPage() {
           </Button>
           <Button onClick={startCreate}>
             <Plus className="w-4 h-4 mr-2" />
-            New eBook
+            Create eBook
           </Button>
           </>
         }
@@ -223,15 +242,16 @@ export function ManageEbooksPage() {
       {message && <AdminNotice tone="success">{message}</AdminNotice>}
       {error && <AdminNotice tone="error">{error}</AdminNotice>}
 
-      <div className="grid gap-8 xl:grid-cols-[1.3fr,0.9fr]">
+      <div className={editorOpen ? 'grid gap-8 xl:grid-cols-[1.3fr,0.9fr]' : 'space-y-6'}>
+        {editorOpen ? (
         <form onSubmit={handleSubmit}>
           <AdminSectionCard
             title={editingId ? 'Edit eBook' : 'Create eBook'}
-            description="Structure reader content and purchase behavior without the page feeling overloaded."
+            description="Open the editor only when you need to create or revise a title."
             badge={
-              editingId ? (
-                <Badge variant={form.status === 'published' ? 'success' : 'warning'}>{form.status}</Badge>
-              ) : undefined
+              <Button variant="ghost" onClick={() => setEditorOpen(false)}>
+                Close Editor
+              </Button>
             }
           >
             <div className="mb-6 flex items-center justify-between">
@@ -299,11 +319,17 @@ export function ManageEbooksPage() {
               </label>
               <label className="block">
                 <span className="mb-2 block text-sm text-slate-700">Category</span>
-                <input
+                <select
                   value={form.category}
                   onChange={(e) => setForm((current) => ({ ...current, category: e.target.value }))}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                />
+                >
+                  {availableCategoryOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="block">
                 <span className="mb-2 block text-sm text-slate-700">File format</span>
@@ -484,11 +510,12 @@ export function ManageEbooksPage() {
             </div>
           </AdminSectionCard>
         </form>
+        ) : null}
 
         <div className="space-y-6 xl:sticky xl:top-24 self-start">
           <AdminSectionCard
             title="eBook Library"
-            description="Review recently added titles and reopen any draft from a cleaner side panel."
+            description="Review published and draft eBooks first, then open the editor only when needed."
           >
             <div className="space-y-4">
               {loading ? (

@@ -1,13 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Edit, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Edit, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { Badge } from '@/components/Badge';
 import { Button } from '@/components/Button';
-import { Card } from '@/components/Card';
 import { AdminNotice, AdminPageHeader, AdminSectionCard } from '@/components/AdminPageChrome';
+import { useAuth } from '@/contexts/AuthContext';
+import { useModuleCategories } from '@/contexts/SiteConfigContext';
+import { getSemesterOptions } from '@/lib/catalog-browse';
+import { getStates, getUniversities, supportsSemesters } from '@/lib/navCatalog';
 import {
   createAdminCourse,
+  deleteAdminCourse,
   fetchAdminCourse,
   fetchAdminCourses,
   updateAdminCourse,
@@ -17,6 +21,17 @@ import {
 } from '@/lib/course-api';
 import { formatRupees } from '@/lib/price';
 
+type QuizOptionFormState = {
+  id: string;
+  text: string;
+};
+
+type QuizQuestionFormState = {
+  prompt: string;
+  correctOptionIdsText: string;
+  options: QuizOptionFormState[];
+};
+
 type LectureFormState = {
   title: string;
   durationText: string;
@@ -24,6 +39,7 @@ type LectureFormState = {
   isPreview: boolean;
   quizTitle: string;
   quizQuestionCount: string;
+  quizQuestions: QuizQuestionFormState[];
 };
 
 type SectionFormState = {
@@ -47,8 +63,9 @@ type FormState = {
   price: string;
   durationText: string;
   tag: string;
-  accessType: 'lifetime' | 'fixed_months';
+  accessType: 'lifetime' | 'fixed_months' | 'fixed_date';
   accessMonths: string;
+  accessFixedDate: string;
   status: 'draft' | 'published';
   learningPointsText: string;
   requirementsText: string;
@@ -56,6 +73,21 @@ type FormState = {
   finalQuizQuestionCount: string;
   sections: SectionFormState[];
 };
+
+function emptyQuizOption(index: number): QuizOptionFormState {
+  return {
+    id: `option-${index + 1}`,
+    text: '',
+  };
+}
+
+function emptyQuizQuestion(): QuizQuestionFormState {
+  return {
+    prompt: '',
+    correctOptionIdsText: '',
+    options: [emptyQuizOption(0), emptyQuizOption(1)],
+  };
+}
 
 function emptyLecture(): LectureFormState {
   return {
@@ -65,6 +97,7 @@ function emptyLecture(): LectureFormState {
     isPreview: false,
     quizTitle: '',
     quizQuestionCount: '0',
+    quizQuestions: [],
   };
 }
 
@@ -77,7 +110,7 @@ function emptySection(): SectionFormState {
   };
 }
 
-function createEmptyForm(): FormState {
+function createEmptyForm(defaultCategory = ''): FormState {
   return {
     title: '',
     slug: '',
@@ -85,7 +118,7 @@ function createEmptyForm(): FormState {
     description: '',
     instructorName: '',
     imageUrl: '',
-    category: '',
+    category: defaultCategory,
     stateName: '',
     universityName: '',
     semesterLabel: '',
@@ -94,6 +127,7 @@ function createEmptyForm(): FormState {
     tag: '',
     accessType: 'lifetime',
     accessMonths: '',
+    accessFixedDate: '',
     status: 'published',
     learningPointsText: '',
     requirementsText: '',
@@ -120,6 +154,7 @@ function toFormState(course: AdminCourse): FormState {
     tag: course.tag ?? '',
     accessType: course.accessType,
     accessMonths: course.accessMonths ? String(course.accessMonths) : '',
+    accessFixedDate: course.accessFixedDate ? course.accessFixedDate.slice(0, 10) : '',
     status: course.status,
     learningPointsText: course.learningPoints.join('\n'),
     requirementsText: course.requirements.join('\n'),
@@ -140,6 +175,18 @@ function toFormState(course: AdminCourse): FormState {
                     isPreview: lecture.isPreview,
                     quizTitle: lecture.quizTitle ?? '',
                     quizQuestionCount: String(lecture.quizQuestionCount),
+                    quizQuestions:
+                      lecture.quizQuestions?.map((question) => ({
+                        prompt: question.prompt,
+                        correctOptionIdsText: question.correctOptionIds.join('\n'),
+                        options:
+                          question.options.length > 0
+                            ? question.options.map((option) => ({
+                                id: option.id,
+                                text: option.text,
+                              }))
+                            : [emptyQuizOption(0), emptyQuizOption(1)],
+                      })) ?? [],
                   }))
                 : [emptyLecture()],
           }))
@@ -151,6 +198,13 @@ function splitLines(value: string): string[] {
   return value
     .split('\n')
     .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function splitCorrectOptionIds(value: string): string[] {
+  return value
+    .split(/[\n,]+/)
+    .map((entry) => entry.trim())
     .filter(Boolean);
 }
 
@@ -171,6 +225,7 @@ function toPayload(form: FormState): AdminCourseInput {
     tag: form.tag.trim() || null,
     accessType: form.accessType,
     accessMonths: form.accessType === 'fixed_months' ? Number(form.accessMonths) || null : null,
+    accessFixedDate: form.accessType === 'fixed_date' ? form.accessFixedDate || null : null,
     status: form.status,
     learningPoints: splitLines(form.learningPointsText),
     requirements: splitLines(form.requirementsText),
@@ -186,21 +241,71 @@ function toPayload(form: FormState): AdminCourseInput {
         videoUrl: lecture.videoUrl.trim() || null,
         isPreview: lecture.isPreview,
         quizTitle: lecture.quizTitle.trim() || null,
-        quizQuestionCount: Number(lecture.quizQuestionCount) || 0,
+        quizQuestionCount:
+          lecture.quizQuestions.length > 0
+            ? lecture.quizQuestions.filter(
+                (question) =>
+                  question.prompt.trim() &&
+                  question.options.filter((option) => option.text.trim()).length >= 2 &&
+                  splitCorrectOptionIds(question.correctOptionIdsText).length > 0
+              ).length
+            : Number(lecture.quizQuestionCount) || 0,
+        quizQuestions: lecture.quizQuestions
+          .map((question) => ({
+            prompt: question.prompt.trim(),
+            options: question.options
+              .map((option, index) => ({
+                id: option.id.trim() || `option-${index + 1}`,
+                text: option.text.trim(),
+              }))
+              .filter((option) => option.text),
+            correctOptionIds: splitCorrectOptionIds(question.correctOptionIdsText),
+          }))
+          .filter(
+            (question) =>
+              question.prompt &&
+              question.options.length >= 2 &&
+              question.correctOptionIds.length > 0
+          ),
       })),
     })),
   };
 }
 
+function accessSummary(course: CourseSummary): string {
+  if (course.accessType === 'fixed_date' && course.accessFixedDate) {
+    return `Until ${new Date(course.accessFixedDate).toLocaleDateString()}`;
+  }
+  if (course.accessType === 'fixed_months' && course.accessMonths) {
+    return `${course.accessMonths} months`;
+  }
+  return 'Lifetime';
+}
+
 export function CourseManagementPage() {
+  const { user } = useAuth();
+  const moduleCategories = useModuleCategories();
+  const categoryOptions = moduleCategories.course.length > 0 ? moduleCategories.course : ['LLB 3 YDC'];
+  const stateOptions = getStates('/courses');
   const [courses, setCourses] = useState<CourseSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(createEmptyForm);
+  const [form, setForm] = useState<FormState>(() => createEmptyForm(categoryOptions[0] ?? ''));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [showCreateSuccess, setShowCreateSuccess] = useState(false);
+  const selectedState = stateOptions.find((state) => state.name === form.stateName);
+  const universityOptions = selectedState ? getUniversities(selectedState.id, '/courses') : [];
+  const selectedUniversity = universityOptions.find((item) => item.name === form.universityName);
+  const shouldShowSemesters = Boolean(
+    selectedState &&
+      selectedUniversity &&
+      supportsSemesters(selectedState.id, selectedUniversity.id, '/courses')
+  );
 
   async function loadCourses() {
     try {
@@ -216,8 +321,14 @@ export function CourseManagementPage() {
   }
 
   useEffect(() => {
-    loadCourses();
+    void loadCourses();
   }, []);
+
+  useEffect(() => {
+    if (!form.category && categoryOptions.length > 0) {
+      setForm((current) => ({ ...current, category: categoryOptions[0] }));
+    }
+  }, [categoryOptions, form.category]);
 
   const sortedCourses = useMemo(
     () =>
@@ -225,6 +336,22 @@ export function CourseManagementPage() {
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       ),
     [courses]
+  );
+
+  const filteredCourses = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return sortedCourses;
+    return sortedCourses.filter((course) =>
+      [course.title, course.slug, course.category, course.status, course.instructorName]
+        .join(' ')
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [searchQuery, sortedCourses]);
+
+  const libraryLectureCount = useMemo(
+    () => sortedCourses.reduce((sum, course) => sum + course.totalLectures, 0),
+    [sortedCourses]
   );
 
   const totalLectures = useMemo(
@@ -259,7 +386,12 @@ export function CourseManagementPage() {
       });
       setEditingId(saved.id);
       setForm(toFormState(saved));
-      setMessage(editingId ? 'Course updated successfully.' : 'Course created successfully.');
+      setEditorOpen(true);
+      if (editingId) {
+        setMessage('Course updated successfully.');
+      } else {
+        setShowCreateSuccess(true);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save course.');
     } finally {
@@ -269,9 +401,10 @@ export function CourseManagementPage() {
 
   function beginCreate() {
     setEditingId(null);
-    setForm(createEmptyForm());
+    setForm(createEmptyForm(categoryOptions[0] ?? ''));
     setMessage(null);
     setError(null);
+    setEditorOpen(true);
   }
 
   async function beginEdit(courseId: string) {
@@ -282,10 +415,31 @@ export function CourseManagementPage() {
       const course = await fetchAdminCourse(courseId);
       setEditingId(course.id);
       setForm(toFormState(course));
+      setEditorOpen(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load course details.');
     } finally {
       setLoadingDetailId(null);
+    }
+  }
+
+  async function handleDelete(course: CourseSummary) {
+    if (user?.role !== 'super_admin') return;
+    if (!window.confirm(`Delete "${course.title}"? This cannot be undone.`)) return;
+
+    try {
+      setError(null);
+      setMessage(null);
+      await deleteAdminCourse(course.id);
+      setCourses((current) => current.filter((item) => item.id !== course.id));
+      if (editingId === course.id) {
+        setEditingId(null);
+        setEditorOpen(false);
+        setForm(createEmptyForm(categoryOptions[0] ?? ''));
+      }
+      setMessage('Course deleted successfully.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete course.');
     }
   }
 
@@ -300,23 +454,31 @@ export function CourseManagementPage() {
     <div>
       <AdminPageHeader
         title="Manage Courses"
-        description="Keep the curriculum builder and publishing workflow easier to scan with a clearer course authoring workspace."
+        description="Review the published and draft list first, then open the editor only when you need to create or revise a course."
         stats={[
           { label: 'Courses', value: String(sortedCourses.length) },
-          { label: 'Published', value: String(sortedCourses.filter((course) => course.status === 'published').length), tone: 'success' },
-          { label: 'Lectures', value: String(totalLectures), tone: 'info' },
-          { label: 'Preview', value: String(previewLectureCount), tone: 'warning' },
+          {
+            label: 'Published',
+            value: String(sortedCourses.filter((course) => course.status === 'published').length),
+            tone: 'success',
+          },
+          {
+            label: 'Drafts',
+            value: String(sortedCourses.filter((course) => course.status === 'draft').length),
+            tone: 'warning',
+          },
+          { label: 'Lectures', value: String(libraryLectureCount), tone: 'info' },
         ]}
         actions={
           <>
-          <Button variant="outline" onClick={() => void loadCourses()}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
-          <Button onClick={beginCreate}>
-            <Plus className="w-4 h-4 mr-2" />
-            New Course
-          </Button>
+            <Button variant="outline" onClick={() => void loadCourses()}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+            <Button onClick={beginCreate}>
+              <Plus className="w-4 h-4 mr-2" />
+              Create Course
+            </Button>
           </>
         }
       />
@@ -324,13 +486,19 @@ export function CourseManagementPage() {
       <div className="mt-8 space-y-8">
       {message && <AdminNotice tone="success">{message}</AdminNotice>}
       {error && <AdminNotice tone="error">{error}</AdminNotice>}
-      <AdminSectionCard
+      {editorOpen && <AdminSectionCard
         title={editingId ? 'Edit Course' : 'Create Course'}
-        description="Shape structure, access rules, and curriculum details from one consistent course editor."
+        description="Use dropdowns for category and academic structure, then build sections, lectures, and quiz details in one editor."
+        badge={
+          <Button variant="ghost" onClick={() => setEditorOpen(false)}>
+            <X className="w-4 h-4 mr-2" />
+            Close Editor
+          </Button>
+        }
       >
         <div className="mb-4 flex flex-wrap gap-3 text-sm text-slate-600">
           <span>{totalLectures} total lectures</span>
-          <span>•</span>
+          <span>|</span>
           <span>{previewLectureCount} preview lectures</span>
         </div>
 
@@ -386,13 +554,19 @@ export function CourseManagementPage() {
               />
             </label>
             <label className="block">
-              <span className="mb-2 block text-sm text-slate-700">Category</span>
-              <input
+              <span className="mb-2 block text-sm text-slate-700">Course Category</span>
+              <select
                 value={form.category}
                 onChange={(e) => setForm((current) => ({ ...current, category: e.target.value }))}
                 className="w-full rounded-lg border border-slate-300 px-4 py-2"
                 required
-              />
+              >
+                {categoryOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="block md:col-span-2">
               <span className="mb-2 block text-sm text-slate-700">Image URL</span>
@@ -405,31 +579,78 @@ export function CourseManagementPage() {
             </label>
             <label className="block">
               <span className="mb-2 block text-sm text-slate-700">State</span>
-              <input
+              <select
                 value={form.stateName}
-                onChange={(e) => setForm((current) => ({ ...current, stateName: e.target.value }))}
+                onChange={(e) =>
+                  setForm((current) => ({
+                    ...current,
+                    stateName: e.target.value,
+                    universityName: '',
+                    semesterLabel: '',
+                  }))
+                }
                 className="w-full rounded-lg border border-slate-300 px-4 py-2"
-              />
+              >
+                <option value="">Select state</option>
+                {stateOptions.map((state) => (
+                  <option key={state.id} value={state.name}>
+                    {state.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="block">
               <span className="mb-2 block text-sm text-slate-700">University</span>
-              <input
+              <select
                 value={form.universityName}
                 onChange={(e) =>
-                  setForm((current) => ({ ...current, universityName: e.target.value }))
+                  setForm((current) => {
+                    const nextUniversityName = e.target.value;
+                    const nextUniversity = universityOptions.find(
+                      (university) => university.name === nextUniversityName
+                    );
+                    const nextSupportsSemesters = Boolean(
+                      selectedState &&
+                        nextUniversity &&
+                        supportsSemesters(selectedState.id, nextUniversity.id, '/courses')
+                    );
+
+                    return {
+                      ...current,
+                      universityName: nextUniversityName,
+                      semesterLabel:
+                        nextUniversityName && nextSupportsSemesters ? current.semesterLabel : '',
+                    };
+                  })
                 }
                 className="w-full rounded-lg border border-slate-300 px-4 py-2"
-              />
+                disabled={!selectedState}
+              >
+                <option value="">Select university</option>
+                {universityOptions.map((university) => (
+                  <option key={university.id} value={university.name}>
+                    {university.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="block">
               <span className="mb-2 block text-sm text-slate-700">Semester</span>
-              <input
+              <select
                 value={form.semesterLabel}
                 onChange={(e) =>
                   setForm((current) => ({ ...current, semesterLabel: e.target.value }))
                 }
                 className="w-full rounded-lg border border-slate-300 px-4 py-2"
-              />
+                disabled={!shouldShowSemesters}
+              >
+                <option value="">{shouldShowSemesters ? 'Select semester' : 'Not required'}</option>
+                {getSemesterOptions().map((semester) => (
+                  <option key={semester.value} value={semester.label}>
+                    {semester.label}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="block">
               <span className="mb-2 block text-sm text-slate-700">Tag</span>
@@ -488,12 +709,15 @@ export function CourseManagementPage() {
                   setForm((current) => ({
                     ...current,
                     accessType: e.target.value as FormState['accessType'],
+                    accessMonths: e.target.value === 'fixed_months' ? current.accessMonths : '',
+                    accessFixedDate: e.target.value === 'fixed_date' ? current.accessFixedDate : '',
                   }))
                 }
                 className="w-full rounded-lg border border-slate-300 px-4 py-2"
               >
                 <option value="lifetime">Lifetime</option>
                 <option value="fixed_months">Fixed months</option>
+                <option value="fixed_date">Fixed date</option>
               </select>
             </label>
             <label className="block">
@@ -506,6 +730,18 @@ export function CourseManagementPage() {
                   setForm((current) => ({ ...current, accessMonths: e.target.value }))
                 }
                 disabled={form.accessType !== 'fixed_months'}
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 disabled:bg-slate-100"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-sm text-slate-700">Access expiry date</span>
+              <input
+                type="date"
+                value={form.accessFixedDate}
+                onChange={(e) =>
+                  setForm((current) => ({ ...current, accessFixedDate: e.target.value }))
+                }
+                disabled={form.accessType !== 'fixed_date'}
                 className="w-full rounded-lg border border-slate-300 px-4 py-2 disabled:bg-slate-100"
               />
             </label>
@@ -581,7 +817,11 @@ export function CourseManagementPage() {
 
             <div className="space-y-6">
               {form.sections.map((section, sectionIndex) => (
-                <div key={`section-${sectionIndex}`} className="rounded-lg border border-slate-200 p-4">
+                <details key={`section-${sectionIndex}`} className="rounded-lg border border-slate-200 bg-slate-50">
+                  <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-slate-900">
+                    Section {sectionIndex + 1}: {section.title || 'Untitled section'}
+                  </summary>
+                  <div className="border-t border-slate-200 bg-white p-4">
                   <div className="mb-4 flex items-center justify-between">
                     <h4 className="text-base">Section {sectionIndex + 1}</h4>
                     <Button
@@ -643,7 +883,14 @@ export function CourseManagementPage() {
 
                   <div className="space-y-4">
                     {section.lectures.map((lecture, lectureIndex) => (
-                      <div key={`lecture-${lectureIndex}`} className="rounded-lg border border-slate-100 bg-slate-50 p-4">
+                      <details
+                        key={`lecture-${lectureIndex}`}
+                        className="rounded-lg border border-slate-200 bg-slate-50"
+                      >
+                        <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-slate-900">
+                          Lecture {lectureIndex + 1}: {lecture.title || 'Untitled lecture'}
+                        </summary>
+                        <div className="border-t border-slate-200 bg-white p-4">
                         <div className="mb-3 flex items-center justify-between">
                           <h5 className="text-sm font-medium text-slate-700">
                             Lecture {lectureIndex + 1}
@@ -768,7 +1015,267 @@ export function CourseManagementPage() {
                             />
                           </label>
                         </div>
-                      </div>
+                        <div className="mt-4 rounded-lg border border-slate-200 p-4">
+                          <div className="mb-4 flex items-center justify-between">
+                            <div>
+                              <h6 className="text-sm font-semibold text-slate-900">Lecture Quiz Builder</h6>
+                              <p className="mt-1 text-xs text-slate-600">
+                                Add quiz prompts, options, and correct option IDs for this lecture.
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                updateSection(sectionIndex, {
+                                  ...section,
+                                  lectures: section.lectures.map((item, index) =>
+                                    index === lectureIndex
+                                      ? { ...item, quizQuestions: [...item.quizQuestions, emptyQuizQuestion()] }
+                                      : item
+                                  ),
+                                })
+                              }
+                            >
+                              <Plus className="w-4 h-4 mr-2" />
+                              Add Question
+                            </Button>
+                          </div>
+
+                          {lecture.quizQuestions.length === 0 ? (
+                            <div className="rounded-lg border border-dashed border-slate-300 px-4 py-4 text-sm text-slate-500">
+                              No quiz questions added yet.
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              {lecture.quizQuestions.map((question, questionIndex) => (
+                                <div
+                                  key={`lecture-${lectureIndex}-question-${questionIndex}`}
+                                  className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                                >
+                                  <div className="mb-3 flex items-center justify-between">
+                                    <h6 className="text-sm font-medium text-slate-900">
+                                      Question {questionIndex + 1}
+                                    </h6>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      className="text-red-600 hover:bg-red-50"
+                                      onClick={() =>
+                                        updateSection(sectionIndex, {
+                                          ...section,
+                                          lectures: section.lectures.map((item, index) =>
+                                            index === lectureIndex
+                                              ? {
+                                                  ...item,
+                                                  quizQuestions: item.quizQuestions.filter(
+                                                    (_, innerIndex) => innerIndex !== questionIndex
+                                                  ),
+                                                }
+                                              : item
+                                          ),
+                                        })
+                                      }
+                                    >
+                                      Remove
+                                    </Button>
+                                  </div>
+
+                                  <div className="space-y-4">
+                                    <label className="block">
+                                      <span className="mb-2 block text-sm text-slate-700">Prompt</span>
+                                      <textarea
+                                        value={question.prompt}
+                                        onChange={(e) =>
+                                          updateSection(sectionIndex, {
+                                            ...section,
+                                            lectures: section.lectures.map((item, index) =>
+                                              index === lectureIndex
+                                                ? {
+                                                    ...item,
+                                                    quizQuestions: item.quizQuestions.map((entry, innerIndex) =>
+                                                      innerIndex === questionIndex
+                                                        ? { ...entry, prompt: e.target.value }
+                                                        : entry
+                                                    ),
+                                                  }
+                                                : item
+                                            ),
+                                          })
+                                        }
+                                        rows={3}
+                                        className="w-full rounded-lg border border-slate-300 px-4 py-2"
+                                      />
+                                    </label>
+
+                                    <div className="space-y-3">
+                                      {question.options.map((option, optionIndex) => (
+                                        <div
+                                          key={`question-${questionIndex}-option-${optionIndex}`}
+                                          className="grid gap-3 md:grid-cols-[0.8fr,1.8fr,auto]"
+                                        >
+                                          <input
+                                            value={option.id}
+                                            onChange={(e) =>
+                                              updateSection(sectionIndex, {
+                                                ...section,
+                                                lectures: section.lectures.map((item, index) =>
+                                                  index === lectureIndex
+                                                    ? {
+                                                        ...item,
+                                                        quizQuestions: item.quizQuestions.map((entry, innerIndex) =>
+                                                          innerIndex === questionIndex
+                                                            ? {
+                                                                ...entry,
+                                                                options: entry.options.map((optionItem, optionInnerIndex) =>
+                                                                  optionInnerIndex === optionIndex
+                                                                    ? { ...optionItem, id: e.target.value }
+                                                                    : optionItem
+                                                                ),
+                                                              }
+                                                            : entry
+                                                        ),
+                                                      }
+                                                    : item
+                                                ),
+                                              })
+                                            }
+                                            className="rounded-lg border border-slate-300 px-3 py-2"
+                                            placeholder="option-id"
+                                          />
+                                          <input
+                                            value={option.text}
+                                            onChange={(e) =>
+                                              updateSection(sectionIndex, {
+                                                ...section,
+                                                lectures: section.lectures.map((item, index) =>
+                                                  index === lectureIndex
+                                                    ? {
+                                                        ...item,
+                                                        quizQuestions: item.quizQuestions.map((entry, innerIndex) =>
+                                                          innerIndex === questionIndex
+                                                            ? {
+                                                                ...entry,
+                                                                options: entry.options.map((optionItem, optionInnerIndex) =>
+                                                                  optionInnerIndex === optionIndex
+                                                                    ? { ...optionItem, text: e.target.value }
+                                                                    : optionItem
+                                                                ),
+                                                              }
+                                                            : entry
+                                                        ),
+                                                      }
+                                                    : item
+                                                ),
+                                              })
+                                            }
+                                            className="rounded-lg border border-slate-300 px-3 py-2"
+                                            placeholder="Option text"
+                                          />
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            className="text-red-600 hover:bg-red-50"
+                                            onClick={() =>
+                                              updateSection(sectionIndex, {
+                                                ...section,
+                                                lectures: section.lectures.map((item, index) =>
+                                                  index === lectureIndex
+                                                    ? {
+                                                        ...item,
+                                                        quizQuestions: item.quizQuestions.map((entry, innerIndex) =>
+                                                          innerIndex === questionIndex
+                                                            ? {
+                                                                ...entry,
+                                                                options:
+                                                                  entry.options.length <= 2
+                                                                    ? entry.options
+                                                                    : entry.options.filter(
+                                                                        (_, optionInnerIndex) => optionInnerIndex !== optionIndex
+                                                                      ),
+                                                              }
+                                                            : entry
+                                                        ),
+                                                      }
+                                                    : item
+                                                ),
+                                              })
+                                            }
+                                            disabled={question.options.length <= 2}
+                                          >
+                                            Remove
+                                          </Button>
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        updateSection(sectionIndex, {
+                                          ...section,
+                                          lectures: section.lectures.map((item, index) =>
+                                            index === lectureIndex
+                                              ? {
+                                                  ...item,
+                                                  quizQuestions: item.quizQuestions.map((entry, innerIndex) =>
+                                                    innerIndex === questionIndex
+                                                      ? {
+                                                          ...entry,
+                                                          options: [
+                                                            ...entry.options,
+                                                            emptyQuizOption(entry.options.length),
+                                                          ],
+                                                        }
+                                                      : entry
+                                                  ),
+                                                }
+                                              : item
+                                          ),
+                                        })
+                                      }
+                                    >
+                                      <Plus className="w-4 h-4 mr-2" />
+                                      Add Option
+                                    </Button>
+
+                                    <label className="block">
+                                      <span className="mb-2 block text-sm text-slate-700">Correct option IDs</span>
+                                      <textarea
+                                        value={question.correctOptionIdsText}
+                                        onChange={(e) =>
+                                          updateSection(sectionIndex, {
+                                            ...section,
+                                            lectures: section.lectures.map((item, index) =>
+                                              index === lectureIndex
+                                                ? {
+                                                    ...item,
+                                                    quizQuestions: item.quizQuestions.map((entry, innerIndex) =>
+                                                      innerIndex === questionIndex
+                                                        ? { ...entry, correctOptionIdsText: e.target.value }
+                                                        : entry
+                                                    ),
+                                                  }
+                                                : item
+                                            ),
+                                          })
+                                        }
+                                        rows={3}
+                                        className="w-full rounded-lg border border-slate-300 px-4 py-2"
+                                        placeholder="One option ID per line"
+                                      />
+                                    </label>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        </div>
+                      </details>
                     ))}
 
                     <Button
@@ -785,27 +1292,42 @@ export function CourseManagementPage() {
                       Add Lecture
                     </Button>
                   </div>
-                </div>
+                  </div>
+                </details>
               ))}
             </div>
           </div>
 
           <div className="flex gap-3">
             <Button type="submit" disabled={submitting}>
-              {submitting ? 'Saving…' : editingId ? 'Update Course' : 'Create Course'}
+              {submitting ? 'Saving...' : editingId ? 'Update Course' : 'Create Course'}
             </Button>
             <Button type="button" variant="outline" onClick={beginCreate}>
               Reset
             </Button>
           </div>
         </form>
-      </AdminSectionCard>
+      </AdminSectionCard>}
 
       <AdminSectionCard
         title="Course Library"
-        description="Review all courses in a cleaner table and jump back into editing without losing context."
+        description="Search the current course list, then open any course to edit or remove it."
         className="overflow-hidden"
       >
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="relative w-full md:max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 py-2 pl-10 pr-3"
+              placeholder="Search courses"
+            />
+          </div>
+          <div className="text-sm text-slate-600">
+            {filteredCourses.length} result{filteredCourses.length === 1 ? '' : 's'}
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
@@ -826,14 +1348,14 @@ export function CourseManagementPage() {
                     Preparing course list...
                   </td>
                 </tr>
-              ) : sortedCourses.length === 0 ? (
+              ) : filteredCourses.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-10 text-center text-slate-500">
-                    No courses found.
+                    No courses matched the current search.
                   </td>
                 </tr>
               ) : (
-                sortedCourses.map((course) => (
+                filteredCourses.map((course) => (
                   <tr key={course.id} className="border-b border-slate-200 last:border-0">
                     <td className="px-6 py-4">
                       <div>
@@ -844,24 +1366,30 @@ export function CourseManagementPage() {
                     <td className="px-6 py-4">{course.category}</td>
                     <td className="px-6 py-4">{course.studentsCount}</td>
                     <td className="px-6 py-4">{formatRupees(course.price)}</td>
-                    <td className="px-6 py-4">
-                      {course.accessType === 'fixed_months' && course.accessMonths
-                        ? `${course.accessMonths} months`
-                        : 'Lifetime'}
-                    </td>
+                    <td className="px-6 py-4">{accessSummary(course)}</td>
                     <td className="px-6 py-4">
                       <Badge variant={course.status === 'published' ? 'success' : 'neutral'}>
                         {course.status}
                       </Badge>
                     </td>
                     <td className="px-6 py-4">
-                      <button
-                        className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
-                        onClick={() => void beginEdit(course.id)}
-                      >
-                        <Edit className="w-4 h-4" />
-                        {loadingDetailId === course.id ? 'Loading…' : 'Edit'}
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onClick={() => void beginEdit(course.id)}>
+                        <Edit className="w-4 h-4 mr-2" />
+                        {loadingDetailId === course.id ? 'Loading...' : 'Edit'}
+                        </Button>
+                        {user?.role === 'super_admin' ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-600 hover:bg-red-50"
+                            onClick={() => void handleDelete(course)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </Button>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -871,6 +1399,20 @@ export function CourseManagementPage() {
         </div>
       </AdminSectionCard>
       </div>
+
+      {showCreateSuccess ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="text-xl font-semibold text-slate-900">Course created successfully</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              The course is saved and available in the course library.
+            </p>
+            <div className="mt-6 flex justify-end">
+              <Button onClick={() => setShowCreateSuccess(false)}>Continue</Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

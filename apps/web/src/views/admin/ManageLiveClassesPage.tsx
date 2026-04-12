@@ -6,6 +6,7 @@ import { Badge } from '@/components/Badge';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { AdminNotice, AdminPageHeader, AdminSectionCard } from '@/components/AdminPageChrome';
+import { useModuleCategories } from '@/contexts/SiteConfigContext';
 import {
   createAdminLiveClass,
   fetchAdminLiveClasses,
@@ -37,27 +38,29 @@ type FormState = {
   cancellationReason: string;
 };
 
-const emptyForm: FormState = {
-  title: '',
-  slug: '',
-  description: '',
-  imageUrl: '',
-  price: '0',
-  instructorName: '',
-  category: 'Live Classes',
-  durationLabel: '',
-  durationMinutes: '90',
-  scheduledAt: '',
-  spotsTotal: '50',
-  meetingUrl: '',
-  meetingProvider: 'google_meet',
-  status: 'scheduled',
-  joinWindowMinutes: '30',
-  registeredEmailRequired: true,
-  tagsText: '',
-  agendaText: '',
-  cancellationReason: '',
-};
+function createEmptyForm(defaultCategory = 'Live Classes'): FormState {
+  return {
+    title: '',
+    slug: '',
+    description: '',
+    imageUrl: '',
+    price: '0',
+    instructorName: '',
+    category: defaultCategory,
+    durationLabel: '',
+    durationMinutes: '90',
+    scheduledAt: '',
+    spotsTotal: '50',
+    meetingUrl: '',
+    meetingProvider: 'google_meet',
+    status: 'scheduled',
+    joinWindowMinutes: '30',
+    registeredEmailRequired: true,
+    tagsText: '',
+    agendaText: '',
+    cancellationReason: '',
+  };
+}
 
 function toLocalDateTimeInput(iso?: string): string {
   if (!iso) return '';
@@ -131,14 +134,18 @@ function toPayload(form: FormState): AdminLiveClassInput {
 }
 
 export function ManageLiveClassesPage() {
+  const moduleCategories = useModuleCategories();
+  const categoryOptions =
+    moduleCategories.liveClass.length > 0 ? moduleCategories.liveClass : ['Live Classes'];
   const [items, setItems] = useState<AdminLiveClass[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(emptyForm);
+  const [form, setForm] = useState<FormState>(() => createEmptyForm(categoryOptions[0] ?? 'Live Classes'));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [refundingId, setRefundingId] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
 
   async function loadItems() {
     try {
@@ -166,6 +173,19 @@ export function ManageLiveClassesPage() {
       }),
     [items]
   );
+  const availableCategoryOptions = useMemo(
+    () =>
+      form.category && !categoryOptions.includes(form.category)
+        ? [form.category, ...categoryOptions]
+        : categoryOptions,
+    [categoryOptions, form.category]
+  );
+
+  useEffect(() => {
+    if (!form.category && categoryOptions.length > 0) {
+      setForm((current) => ({ ...current, category: categoryOptions[0] }));
+    }
+  }, [categoryOptions, form.category]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -185,6 +205,7 @@ export function ManageLiveClassesPage() {
       });
       setEditingId(result.item.id);
       setForm(toFormState(result.item));
+      setEditorOpen(true);
       setMessage(
         editingId
           ? result.notifiedUsers > 0
@@ -217,9 +238,10 @@ export function ManageLiveClassesPage() {
 
   function startCreate() {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm(createEmptyForm(categoryOptions[0] ?? 'Live Classes'));
     setMessage(null);
     setError(null);
+    setEditorOpen(true);
   }
 
   return (
@@ -241,7 +263,7 @@ export function ManageLiveClassesPage() {
           </Button>
           <Button onClick={startCreate}>
             <Plus className="w-4 h-4 mr-2" />
-            Schedule Class
+            Create Live Class
           </Button>
           </>
         }
@@ -251,9 +273,15 @@ export function ManageLiveClassesPage() {
         {message && <AdminNotice tone="success">{message}</AdminNotice>}
         {error && <AdminNotice tone="error">{error}</AdminNotice>}
 
+      {editorOpen ? (
       <AdminSectionCard
         title={editingId ? 'Edit Live Class' : 'Create Live Class'}
-        description="Keep scheduling, meeting access, and cancellation settings in one tidy form."
+        description="Open the editor only when you need to add or revise a live class."
+        badge={
+          <Button variant="ghost" onClick={() => setEditorOpen(false)}>
+            Close Editor
+          </Button>
+        }
       >
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -295,12 +323,18 @@ export function ManageLiveClassesPage() {
             </label>
             <label className="block">
               <span className="mb-2 block text-sm text-slate-700">Category</span>
-              <input
+              <select
                 value={form.category}
                 onChange={(e) => setForm((current) => ({ ...current, category: e.target.value }))}
                 className="w-full rounded-lg border border-slate-300 px-4 py-2"
                 required
-              />
+              >
+                {availableCategoryOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="block md:col-span-2">
               <span className="mb-2 block text-sm text-slate-700">Image URL</span>
@@ -462,10 +496,11 @@ export function ManageLiveClassesPage() {
           </div>
         </form>
       </AdminSectionCard>
+      ) : null}
 
       <AdminSectionCard
         title="Scheduled Classes"
-        description="Monitor delivery status and reopen any live class edit or refund action from one list."
+        description="Review scheduled sessions first, then open the editor only when needed."
       >
       <div className="space-y-4">
         {loading ? (
@@ -517,6 +552,7 @@ export function ManageLiveClassesPage() {
                     onClick={() => {
                       setEditingId(item.id);
                       setForm(toFormState(item));
+                      setEditorOpen(true);
                       setMessage(null);
                       setError(null);
                     }}

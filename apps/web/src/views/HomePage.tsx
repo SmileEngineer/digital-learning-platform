@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Award, BookOpen, BookText, FileText, Video } from 'lucide-react';
 import { CourseCard } from '@/components/CourseCard';
 import { UniversityShowcase, type UniversityShowcaseSection } from '@/components/UniversityShowcase';
+import { useSiteConfig } from '@/contexts/SiteConfigContext';
 import { fetchCourses, type CourseSummary } from '@/lib/course-api';
 import { fetchCatalogItems } from '@/lib/platform-api';
 import { buildBrowseHref, findBrowseSelection, getAllUniversities } from '@/lib/catalog-browse';
@@ -53,6 +54,7 @@ const categories = [
 ] as const;
 
 export function HomePage() {
+  const { config } = useSiteConfig();
   const [courses, setCourses] = useState<CourseSummary[]>([]);
 
   useEffect(() => {
@@ -111,13 +113,13 @@ export function HomePage() {
         <div className="container mx-auto px-4">
           <div className="mx-auto max-w-4xl py-2 text-center">
             <p className="text-lg font-semibold text-indigo-100 sm:text-xl">
-              Kantri by Awareness, Honest by Conscience.
+              {config.homeBanner.eyebrow}
             </p>
             <h1 className="mt-2 text-xl font-black tracking-tight sm:text-2xl lg:text-3xl">
-              An anonymous voice on a mission to simplify the law for the common people.
+              {config.homeBanner.title}
             </h1>
             <p className="mx-auto mt-2 max-w-3xl text-sm text-indigo-100 sm:text-base">
-              A sincere desire to build responsible citizens with strong values is my credential.
+              {config.homeBanner.description}
             </p>
           </div>
         </div>

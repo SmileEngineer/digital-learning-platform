@@ -1,5 +1,6 @@
 import { DashboardAuthGate } from '@/components/DashboardAuthGate';
 import { DashboardLayout } from '@/layouts/DashboardLayout';
+import { RootLayout } from '@/layouts/RootLayout';
 
 export default function Layout({
   children,
@@ -8,7 +9,9 @@ export default function Layout({
 }) {
   return (
     <DashboardAuthGate>
-      <DashboardLayout>{children}</DashboardLayout>
+      <RootLayout>
+        <DashboardLayout>{children}</DashboardLayout>
+      </RootLayout>
     </DashboardAuthGate>
   );
 }

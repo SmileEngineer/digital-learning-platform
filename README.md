@@ -38,9 +38,9 @@ This applies all files in `apps/api/db/migrations/`, including password-reset to
 
 Configure these on the **API** (`apps/api/.env` or repo root `.env`):
 
-- **`PUBLIC_SITE_URL`** — public site base URL used in password-reset links (e.g. `https://your-site.com`).
-- **`RESEND_API_KEY`** + **`RESEND_FROM_EMAIL`** — when set, the API sends transactional mail via [Resend](https://resend.com/) (password reset, order confirmation, and the same copy as in-app notifications). If unset, emails are skipped (logged only).
-- **`RAZORPAY_KEY_ID`** + **`RAZORPAY_KEY_SECRET`** — when both are set, `/checkout` can collect **INR** payments through Razorpay for catalog items priced in INR. Otherwise checkout stays on the **demo purchase** flow (immediate paid order for testing).
+- `**PUBLIC_SITE_URL`** — public site base URL used in password-reset links (e.g. `https://your-site.com`).
+- `**RESEND_API_KEY`** + `**RESEND_FROM_EMAIL`** — when set, the API sends transactional mail via [Resend](https://resend.com/) (password reset, order confirmation, and the same copy as in-app notifications). If unset, emails are skipped (logged only).
+- `**RAZORPAY_KEY_ID**` + `**RAZORPAY_KEY_SECRET**` — when both are set, `/checkout` can collect **INR** payments through Razorpay for catalog items priced in INR. Otherwise checkout stays on the **demo purchase** flow (immediate paid order for testing).
 
 ### Test login (after migrate)
 
@@ -61,22 +61,26 @@ Kantri Lawyer sample content is seeded by `apps/api/db/migrations/015_kantri_req
 
 Sample slugs you can use for manual testing:
 
-| Type            | Slug                                 | Notes                    |
-| --------------- | ------------------------------------ | ------------------------ |
-| Course          | `law-of-contracts-i-ou-semester-1`   | Lifetime access with preview lecture |
-| eBook           | `last-minute-exam-prep-guide-llb-first-semester-tg` | Watermarked reader/download |
-| eBook           | `last-minute-exam-prep-guide-llb-first-semester-ap` | Watermarked reader/download |
-| Physical book   | `last-minute-exam-prep-guide-llb-first-semester-tg-physical-book` | DTDC shipping flow |
-| Live class      | `law-of-contracts-i-live-revision-class` | Google Meet gated join |
-| Practice exam   | `law-of-contracts-i-practice-exam` | Limited attempts and hidden answers |
-| Article         | `law-of-contracts-i-study-article` | Free read-only article |
+
+| Type          | Slug                                                              | Notes                                |
+| ------------- | ----------------------------------------------------------------- | ------------------------------------ |
+| Course        | `law-of-contracts-i-ou-semester-1`                                | Lifetime access with preview lecture |
+| eBook         | `last-minute-exam-prep-guide-llb-first-semester-tg`               | Watermarked reader/download          |
+| eBook         | `last-minute-exam-prep-guide-llb-first-semester-ap`               | Watermarked reader/download          |
+| Physical book | `last-minute-exam-prep-guide-llb-first-semester-tg-physical-book` | DTDC shipping flow                   |
+| Live class    | `law-of-contracts-i-live-revision-class`                          | Google Meet gated join               |
+| Practice exam | `law-of-contracts-i-practice-exam`                                | Limited attempts and hidden answers  |
+| Article       | `law-of-contracts-i-study-article`                                | Free read-only article               |
+
 
 Demo coupon for checkout testing:
 
-| Coupon    | Who can use it          | Applies to                                 | Discount |
-| --------- | ----------------------- | ------------------------------------------ | -------- |
-| `DEMO25`  | `demo@learnhub.local`   | `course`, `ebook`, `live_class`, `practice_exam` | 25% off  |
-| `WELCOME10` | Any seeded/local user | Most purchasable catalog items             | 10% off  |
+
+| Coupon      | Who can use it        | Applies to                                       | Discount |
+| ----------- | --------------------- | ------------------------------------------------ | -------- |
+| `DEMO25`    | `demo@learnhub.local` | `course`, `ebook`, `live_class`, `practice_exam` | 25% off  |
+| `WELCOME10` | Any seeded/local user | Most purchasable catalog items                   | 10% off  |
+
 
 Recommended manual test flow:
 
@@ -131,17 +135,18 @@ The Next.js app (`apps/web`) and the Express API (`apps/api`) are separate proce
 | **Render**               | `JWT_SECRET`   | Long random string (required in production; e.g. `openssl rand -base64 32`)       |
 | **Render**               | `CORS_ORIGIN`  | `https://digital-learnhub.netlify.app` (comma-separated if you have more origins) |
 
+
 #### CORS on Render (no separate “CORS” screen)
 
-Render does **not** expose a CORS switch in the dashboard. This app enables CORS in Express using the **`CORS_ORIGIN`** environment variable.
+Render does **not** expose a CORS switch in the dashboard. This app enables CORS in Express using the `**CORS_ORIGIN`** environment variable.
 
 1. In [Render Dashboard](https://dashboard.render.com) open your **Web Service** (the Express API).
 2. Go to **Environment** (or **Environment → Environment Variables**).
-3. **Add** (or edit) **`CORS_ORIGIN`** = your Netlify site origin exactly, e.g. `https://digital-learnhub.netlify.app` (scheme + host, no path; no trailing slash).
+3. **Add** (or edit) `**CORS_ORIGIN`** = your Netlify site origin exactly, e.g. `https://digital-learnhub.netlify.app` (scheme + host, no path; no trailing slash).
 4. For multiple sites or previews, use commas: `https://digital-learnhub.netlify.app,https://deploy-preview-123--yoursite.netlify.app`.
 5. **Save** and **Manual Deploy → Clear build cache & deploy** is usually not needed for env-only changes—Render restarts the service when you save env vars.
 
-**Note:** Login from Netlify calls your API **from the Next.js server** (server-side `fetch`), not from the browser. So a broken login is usually **`API_URL` wrong or missing on Netlify**, the API down, or TLS/timeout—not CORS. CORS matters when the **browser** calls the API directly (e.g. future `fetch` to Render from `https://…netlify.app`).
+**Note:** Login from Netlify calls your API **from the Next.js server** (server-side `fetch`), not from the browser. So a broken login is usually `**API_URL` wrong or missing on Netlify**, the API down, or TLS/timeout—not CORS. CORS matters when the **browser** calls the API directly (e.g. future `fetch` to Render from `https://…netlify.app`).
 
 1. Run `**npm run db:migrate`** locally (or from CI) with `DATABASE_URL` pointing at the **same** Neon DB your Render API uses, so the `users` table exists in production.
 2. In **Netlify → Site configuration → Environment variables**, set `**API_URL`** to your Render API base URL (no trailing slash). **Redeploy** the site after saving—`API_URL` is read at runtime by the Next.js server, not baked into the client bundle.

@@ -27,6 +27,7 @@ type DbCourseRow = {
   preview_lecture_count: number;
   access_type: 'lifetime' | 'fixed_months';
   access_months: number | null;
+  access_fixed_date: string | null;
   status: 'draft' | 'published';
   learning_points: unknown;
   requirements: unknown;
@@ -51,6 +52,18 @@ type DbLectureRow = {
   is_preview: boolean | null;
   lecture_quiz_title: string | null;
   lecture_quiz_question_count: number | null;
+  lecture_quiz_payload: unknown;
+};
+
+type CourseQuizOptionInput = {
+  id: string;
+  text: string;
+};
+
+type CourseQuizQuestionInput = {
+  prompt: string;
+  options: CourseQuizOptionInput[];
+  correctOptionIds: string[];
 };
 
 type CourseLectureInput = {
@@ -60,6 +73,7 @@ type CourseLectureInput = {
   isPreview: boolean;
   quizTitle: string | null;
   quizQuestionCount: number;
+  quizQuestions: CourseQuizQuestionInput[];
 };
 
 type CourseSectionInput = {
@@ -85,8 +99,9 @@ type CourseWriteInput = {
   tag: string | null;
   totalLectures: number;
   previewLectureCount: number;
-  accessType: 'lifetime' | 'fixed_months';
+  accessType: 'lifetime' | 'fixed_months' | 'fixed_date';
   accessMonths: number | null;
+  accessFixedDate: string | null;
   status: 'draft' | 'published';
   learningPoints: string[];
   requirements: string[];
@@ -120,6 +135,7 @@ type CourseSectionDto = {
     isPreview: boolean;
     quizTitle: string | null;
     quizQuestionCount: number;
+    quizQuestions: CourseQuizQuestionInput[];
   }>;
 };
 
@@ -160,6 +176,92 @@ function parsePositiveInt(value: unknown, { allowZero = false } = {}): number | 
   if (!Number.isInteger(num)) return null;
   if (allowZero ? num < 0 : num <= 0) return null;
   return num;
+}
+
+function parseStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+    .filter(Boolean);
+}
+
+function parseIsoDate(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = new Date(trimmed);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function parseQuizOptions(value: unknown): { options?: CourseQuizOptionInput[]; error?: string } {
+  if (!Array.isArray(value) || value.length < 2) {
+    return { error: 'Quiz questions require at least two options.' };
+  }
+
+  const options: CourseQuizOptionInput[] = [];
+  for (const [optionIndex, rawOption] of value.entries()) {
+    if (!rawOption || typeof rawOption !== 'object') {
+      return { error: `Quiz option ${optionIndex + 1} is invalid.` };
+    }
+    const option = rawOption as Record<string, unknown>;
+    const text = parseOptionalString(option.text);
+    if (!text) {
+      return { error: `Quiz option ${optionIndex + 1} requires text.` };
+    }
+    const id = normalizeSlug(parseOptionalString(option.id) ?? text);
+    if (!id) {
+      return { error: `Quiz option ${optionIndex + 1} requires an id.` };
+    }
+    options.push({ id, text });
+  }
+
+  return { options };
+}
+
+function parseQuizQuestions(
+  value: unknown
+): { questions?: CourseQuizQuestionInput[]; error?: string } {
+  if (value === null || value === undefined || value === '') {
+    return { questions: [] };
+  }
+  if (!Array.isArray(value)) {
+    return { error: 'Quiz questions must be an array.' };
+  }
+
+  const questions: CourseQuizQuestionInput[] = [];
+  for (const [questionIndex, rawQuestion] of value.entries()) {
+    if (!rawQuestion || typeof rawQuestion !== 'object') {
+      return { error: `Quiz question ${questionIndex + 1} is invalid.` };
+    }
+    const question = rawQuestion as Record<string, unknown>;
+    const prompt = parseOptionalString(question.prompt);
+    if (!prompt) {
+      return { error: `Quiz question ${questionIndex + 1} requires a prompt.` };
+    }
+    const parsedOptions = parseQuizOptions(question.options);
+    if (!parsedOptions.options) {
+      return { error: parsedOptions.error ?? `Quiz question ${questionIndex + 1} options are invalid.` };
+    }
+    const validOptionIds = new Set(parsedOptions.options.map((option) => option.id));
+    const correctOptionIds = parseStringArray(question.correctOptionIds)
+      .map((entry) => normalizeSlug(entry))
+      .filter((entry) => validOptionIds.has(entry));
+    if (correctOptionIds.length === 0) {
+      return { error: `Quiz question ${questionIndex + 1} requires at least one correct option.` };
+    }
+    questions.push({
+      prompt,
+      options: parsedOptions.options,
+      correctOptionIds,
+    });
+  }
+
+  return { questions };
+}
+
+function parseLectureQuizPayload(value: unknown): CourseQuizQuestionInput[] {
+  const parsed = parseQuizQuestions(value);
+  return parsed.questions ?? [];
 }
 
 function parseSections(
@@ -207,6 +309,10 @@ function parseSections(
         return { error: `Lecture ${lectureTitle} requires a duration.` };
       }
       const lectureQuizTitle = parseOptionalString(lecture.quizTitle);
+      const parsedQuizQuestions = parseQuizQuestions(lecture.quizQuestions);
+      if (!parsedQuizQuestions.questions) {
+        return { error: `${lectureTitle}: ${parsedQuizQuestions.error ?? 'Quiz questions are invalid.'}` };
+      }
       const lectureQuizQuestionCount = parsePositiveInt(lecture.quizQuestionCount ?? 0, { allowZero: true });
       if (lectureQuizQuestionCount === null) {
         return { error: `Lecture ${lectureTitle} quiz question count must be 0 or greater.` };
@@ -221,7 +327,11 @@ function parseSections(
         videoUrl: parseOptionalString(lecture.videoUrl),
         isPreview,
         quizTitle: lectureQuizTitle,
-        quizQuestionCount: lectureQuizQuestionCount,
+        quizQuestionCount:
+          parsedQuizQuestions.questions.length > 0
+            ? parsedQuizQuestions.questions.length
+            : lectureQuizQuestionCount,
+        quizQuestions: parsedQuizQuestions.questions,
       });
     }
 
@@ -261,10 +371,19 @@ function parseCourseInput(body: Record<string, unknown>): { data?: CourseWriteIn
   const price = parsePositiveMoney(body.price);
   if (price === null) return { error: 'Price must be a valid number.' };
 
-  const accessType = body.accessType === 'fixed_months' ? 'fixed_months' : 'lifetime';
+  const accessType =
+    body.accessType === 'fixed_date'
+      ? 'fixed_date'
+      : body.accessType === 'fixed_months'
+        ? 'fixed_months'
+        : 'lifetime';
   const accessMonths = accessType === 'fixed_months' ? parsePositiveInt(body.accessMonths) : null;
   if (accessType === 'fixed_months' && accessMonths === null) {
     return { error: 'Access months must be a positive number for fixed-duration courses.' };
+  }
+  const accessFixedDate = accessType === 'fixed_date' ? parseIsoDate(body.accessFixedDate) : null;
+  if (accessType === 'fixed_date' && !accessFixedDate) {
+    return { error: 'Select a valid access expiry date for fixed-date access.' };
   }
 
   const status = body.status === 'draft' ? 'draft' : 'published';
@@ -302,6 +421,7 @@ function parseCourseInput(body: Record<string, unknown>): { data?: CourseWriteIn
       previewLectureCount: parsedSections.previewLectureCount ?? 0,
       accessType,
       accessMonths,
+      accessFixedDate,
       status,
       learningPoints: toStringArray(body.learningPoints),
       requirements: toStringArray(body.requirements),
@@ -331,8 +451,10 @@ function toCourseSummary(row: DbCourseRow) {
     tag: row.tag,
     totalLectures: row.total_lectures,
     previewLectureCount: row.preview_lecture_count,
-    accessType: row.access_type,
+    accessType:
+      row.access_type === 'fixed_months' && row.access_fixed_date ? 'fixed_date' : row.access_type,
     accessMonths: row.access_months,
+    accessFixedDate: row.access_fixed_date,
     status: row.status,
     learningPoints: toStringArray(row.learning_points),
     requirements: toStringArray(row.requirements),
@@ -449,7 +571,8 @@ async function getCourseSections(
       l.position AS lecture_position,
       l.is_preview AS is_preview,
       l.quiz_title AS lecture_quiz_title,
-      l.quiz_question_count AS lecture_quiz_question_count
+      l.quiz_question_count AS lecture_quiz_question_count,
+      to_jsonb(l)->'quiz_payload' AS lecture_quiz_payload
     FROM course_sections s
     LEFT JOIN course_lectures l ON l.section_id = s.id
     WHERE s.course_id = ${courseId}
@@ -479,6 +602,7 @@ async function getCourseSections(
         isPreview: Boolean(row.is_preview),
         quizTitle: row.lecture_quiz_title,
         quizQuestionCount: row.lecture_quiz_question_count ?? 0,
+        quizQuestions: parseLectureQuizPayload(row.lecture_quiz_payload),
       });
     }
 
@@ -489,6 +613,7 @@ async function getCourseSections(
 }
 
 function accessExpiresAtForCourse(row: DbCourseRow): Date | null {
+  if (row.access_fixed_date) return new Date(row.access_fixed_date);
   if (row.access_type !== 'fixed_months' || !row.access_months) return null;
   const out = new Date();
   out.setMonth(out.getMonth() + row.access_months);
@@ -610,7 +735,8 @@ async function replaceCourseCurriculum(
           position,
           is_preview,
           quiz_title,
-          quiz_question_count
+          quiz_question_count,
+          quiz_payload
         )
         VALUES (
           ${sectionId},
@@ -620,7 +746,8 @@ async function replaceCourseCurriculum(
           ${lectureIndex + 1},
           ${lecture.isPreview},
           ${lecture.quizTitle},
-          ${lecture.quizQuestionCount}
+          ${lecture.quizQuestionCount},
+          ${JSON.stringify(lecture.quizQuestions)}::jsonb
         )
       `;
     }
@@ -648,12 +775,21 @@ async function syncCourseCatalogItem(
     `;
   }
 
-  const validityDays = row.access_type === 'fixed_months' && row.access_months ? row.access_months * 30 : null;
+  const validityDays =
+    row.access_fixed_date
+      ? Math.max(
+          0,
+          Math.ceil((new Date(row.access_fixed_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+        )
+      : row.access_type === 'fixed_months' && row.access_months
+        ? row.access_months * 30
+        : null;
   const tags = row.tag ? [row.tag] : [];
   const metadata = {
     previewLectures: row.preview_lecture_count,
-    accessType: row.access_type,
+    accessType: row.access_type === 'fixed_months' && row.access_fixed_date ? 'fixed_date' : row.access_type,
     accessMonths: row.access_months,
+    accessFixedDate: row.access_fixed_date,
     finalQuizTitle: row.final_quiz_title,
     finalQuizQuestionCount: row.final_quiz_question_count,
     stateName: row.state_name,
@@ -1067,6 +1203,7 @@ export function createAdminCoursesRouter(sql: NeonQueryFunction<false, false>): 
           preview_lecture_count,
           access_type,
           access_months,
+          access_fixed_date,
           status,
           learning_points,
           requirements,
@@ -1089,8 +1226,9 @@ export function createAdminCoursesRouter(sql: NeonQueryFunction<false, false>): 
           ${input.tag},
           ${input.totalLectures},
           ${input.previewLectureCount},
-          ${input.accessType},
-          ${input.accessMonths},
+          ${input.accessType === 'lifetime' ? 'lifetime' : 'fixed_months'},
+          ${input.accessType === 'fixed_months' ? input.accessMonths : null},
+          ${input.accessType === 'fixed_date' ? input.accessFixedDate : null},
           ${input.status},
           ${input.learningPoints},
           ${input.requirements},
@@ -1151,8 +1289,9 @@ export function createAdminCoursesRouter(sql: NeonQueryFunction<false, false>): 
           tag = ${input.tag},
           total_lectures = ${input.totalLectures},
           preview_lecture_count = ${input.previewLectureCount},
-          access_type = ${input.accessType},
-          access_months = ${input.accessMonths},
+          access_type = ${input.accessType === 'lifetime' ? 'lifetime' : 'fixed_months'},
+          access_months = ${input.accessType === 'fixed_months' ? input.accessMonths : null},
+          access_fixed_date = ${input.accessType === 'fixed_date' ? input.accessFixedDate : null},
           status = ${input.status},
           learning_points = ${input.learningPoints},
           requirements = ${input.requirements},
@@ -1172,6 +1311,38 @@ export function createAdminCoursesRouter(sql: NeonQueryFunction<false, false>): 
     } catch (error) {
       console.error('admin:courses:update', error);
       res.status(500).json({ error: 'Could not update course.' });
+    }
+  });
+
+  router.delete('/courses/:id', async (req, res) => {
+    try {
+      const user = await requireAdminPermission(req, res, sql, 'courses');
+      if (!user) return;
+      if (user.role !== 'super_admin') {
+        res.status(403).json({ error: 'Only the super admin can delete courses.' });
+        return;
+      }
+
+      const existing = await getCourseById(sql, req.params.id);
+      if (!existing) {
+        res.status(404).json({ error: 'Course not found.' });
+        return;
+      }
+
+      await sql`
+        DELETE FROM catalog_items
+        WHERE type = 'course'
+          AND slug = ${existing.slug}
+      `;
+      await sql`
+        DELETE FROM courses
+        WHERE id = ${existing.id}
+      `;
+
+      res.json({ ok: true, id: existing.id });
+    } catch (error) {
+      console.error('admin:courses:delete', error);
+      res.status(500).json({ error: 'Could not delete course.' });
     }
   });
 

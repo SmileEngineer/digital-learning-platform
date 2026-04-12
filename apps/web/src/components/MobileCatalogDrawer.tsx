@@ -29,14 +29,13 @@ function CatalogSection({
   const states = getStates(base);
   const [stateId, setStateId] = useState(states[0]?.id ?? '');
   const universities = getUniversities(stateId, base);
-  const [universityId, setUniversityId] = useState(() => universities[0]?.id ?? '');
+  const [universityId, setUniversityId] = useState('');
 
   useEffect(() => {
-    const next = getUniversities(stateId, base);
-    setUniversityId(next[0]?.id ?? '');
+    setUniversityId('');
   }, [base, stateId]);
 
-  const uni = universityId || universities[0]?.id || '';
+  const uni = universityId;
   const showSemesters = uni ? supportsSemesters(stateId, uni, base) : false;
 
   return (
@@ -120,13 +119,6 @@ export function MobileCatalogDrawer() {
         </SheetHeader>
         <nav className="mt-6 flex flex-col gap-2 text-[0.9375rem] font-medium">
           <Link
-            href="/"
-            className="rounded-lg px-3 py-2 text-slate-800 hover:bg-slate-100"
-            onClick={() => setOpen(false)}
-          >
-            Home
-          </Link>
-          <Link
             href="/courses"
             className="rounded-lg px-3 py-2 text-slate-800 hover:bg-slate-100"
             onClick={() => setOpen(false)}
@@ -166,7 +158,7 @@ export function MobileCatalogDrawer() {
             className="rounded-lg px-3 py-2 text-slate-800 hover:bg-slate-100"
             onClick={() => setOpen(false)}
           >
-            Article
+            Articles
           </Link>
           <Link
             href="/contact"

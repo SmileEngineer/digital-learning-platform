@@ -2,6 +2,14 @@ import { Router } from 'express';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import { hashPassword } from '../auth/crypto.js';
 import {
+  DEFAULT_HOME_BANNER,
+  DEFAULT_MODULE_CATEGORIES,
+  DEFAULT_SITE_NAVIGATION,
+  parseHomeBanner,
+  parseModuleCategories,
+  parseNavigationConfig,
+} from '../site-config-defaults.js';
+import {
   ADMIN_PERMISSION_KEYS,
   type AdminPermission,
   getSessionUser,
@@ -632,16 +640,46 @@ export function createAdminToolsRouter(sql: NeonQueryFunction<false, false>): Ro
       const user = await requireAdminPermission(req, res, sql, 'settings');
       if (!user) return;
       const rows = await sql`
-        SELECT home_scroller_enabled, home_scroller_message
+        SELECT
+          home_scroller_enabled,
+          home_scroller_message,
+          home_banner_eyebrow,
+          home_banner_title,
+          home_banner_description,
+          course_navigation,
+          ebook_navigation,
+          module_categories
         FROM site_settings
         WHERE id = 1
         LIMIT 1
       `;
-      const row = rows[0] as { home_scroller_enabled: boolean; home_scroller_message: string | null } | undefined;
+      const row =
+        rows[0] as
+          | {
+              home_scroller_enabled: boolean;
+              home_scroller_message: string | null;
+              home_banner_eyebrow: string | null;
+              home_banner_title: string | null;
+              home_banner_description: string | null;
+              course_navigation: unknown;
+              ebook_navigation: unknown;
+              module_categories: unknown;
+            }
+          | undefined;
       res.json({
         settings: {
           homeScrollerEnabled: row?.home_scroller_enabled ?? false,
           homeScrollerMessage: row?.home_scroller_message ?? '',
+          homeBanner: parseHomeBanner({
+            eyebrow: row?.home_banner_eyebrow ?? DEFAULT_HOME_BANNER.eyebrow,
+            title: row?.home_banner_title ?? DEFAULT_HOME_BANNER.title,
+            description: row?.home_banner_description ?? DEFAULT_HOME_BANNER.description,
+          }),
+          navigation: parseNavigationConfig({
+            courses: row?.course_navigation ?? DEFAULT_SITE_NAVIGATION.courses,
+            ebooks: row?.ebook_navigation ?? DEFAULT_SITE_NAVIGATION.ebooks,
+          }),
+          moduleCategories: parseModuleCategories(row?.module_categories ?? DEFAULT_MODULE_CATEGORIES),
         },
       });
     } catch (e) {
@@ -657,20 +695,60 @@ export function createAdminToolsRouter(sql: NeonQueryFunction<false, false>): Ro
       const body = (req.body ?? {}) as Record<string, unknown>;
       const homeScrollerEnabled = body.homeScrollerEnabled === true;
       const homeScrollerMessage = parseOptionalString(body.homeScrollerMessage) ?? '';
+      const homeBanner = parseHomeBanner(
+        body.homeBanner && typeof body.homeBanner === 'object'
+          ? (body.homeBanner as {
+              eyebrow?: unknown;
+              title?: unknown;
+              description?: unknown;
+            })
+          : null
+      );
+      const navigation = parseNavigationConfig(body.navigation);
+      const moduleCategories = parseModuleCategories(body.moduleCategories);
       await sql`
-        INSERT INTO site_settings (id, home_scroller_enabled, home_scroller_message)
-        VALUES (1, ${homeScrollerEnabled}, ${homeScrollerMessage})
+        INSERT INTO site_settings (
+          id,
+          home_scroller_enabled,
+          home_scroller_message,
+          home_banner_eyebrow,
+          home_banner_title,
+          home_banner_description,
+          course_navigation,
+          ebook_navigation,
+          module_categories
+        )
+        VALUES (
+          1,
+          ${homeScrollerEnabled},
+          ${homeScrollerMessage},
+          ${homeBanner.eyebrow},
+          ${homeBanner.title},
+          ${homeBanner.description},
+          ${JSON.stringify(navigation.courses)}::jsonb,
+          ${JSON.stringify(navigation.ebooks)}::jsonb,
+          ${JSON.stringify(moduleCategories)}::jsonb
+        )
         ON CONFLICT (id)
         DO UPDATE
         SET
           home_scroller_enabled = EXCLUDED.home_scroller_enabled,
           home_scroller_message = EXCLUDED.home_scroller_message,
+          home_banner_eyebrow = EXCLUDED.home_banner_eyebrow,
+          home_banner_title = EXCLUDED.home_banner_title,
+          home_banner_description = EXCLUDED.home_banner_description,
+          course_navigation = EXCLUDED.course_navigation,
+          ebook_navigation = EXCLUDED.ebook_navigation,
+          module_categories = EXCLUDED.module_categories,
           updated_at = NOW()
       `;
       res.json({
         settings: {
           homeScrollerEnabled,
           homeScrollerMessage,
+          homeBanner,
+          navigation,
+          moduleCategories,
         },
       });
     } catch (e) {

@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { useState } from 'react';
 import { Badge } from './Badge';
 import { Button } from './Button';
 import { Clock, MapPin } from 'lucide-react';
@@ -32,15 +35,18 @@ export function CourseCard({
   semesterLabel,
 }: CourseCardProps) {
   const browseSummary = [stateName, universityName, semesterLabel].filter(Boolean).join(' / ');
+  const [imageErrored, setImageErrored] = useState(false);
+  const imageSrc = imageErrored || !image ? '/images/logo.png' : image;
 
   return (
     <Link href={`/courses/${id}`} className="group">
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow duration-200">
-        <div className="relative h-48 overflow-hidden">
+        <div className="relative flex h-48 items-center justify-center overflow-hidden bg-slate-100 p-3">
           <img 
-            src={image} 
+            src={imageSrc}
             alt={title} 
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+            className="h-full w-full object-contain transition-transform duration-200 group-hover:scale-105"
+            onError={() => setImageErrored(true)}
           />
           {tags.length > 0 && (
             <div className="absolute top-3 left-3 flex flex-wrap gap-2">

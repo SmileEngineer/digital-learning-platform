@@ -12,7 +12,7 @@
   gap: 3rem;
   white-space: nowrap;
   will-change: transform;
-  animation: kantri-marquee 20s linear infinite;
+  animation: kantri-marquee 32s linear infinite;
 }
 
 @keyframes kantri-marquee {

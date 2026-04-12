@@ -39,20 +39,29 @@ export function Header() {
   const router = useRouter();
   const [scroller, setScroller] = useState({ enabled: true, message: underConstructionNotice });
   const [headerSearch, setHeaderSearch] = useState('');
+  const [profileHover, setProfileHover] = useState(false);
   const accountHref =
     user?.role === 'staff' || user?.role === 'admin' || user?.role === 'super_admin' ? '/admin' : '/dashboard';
 
   useEffect(() => {
     let cancelled = false;
-    fetchHomeHighlights()
-      .then((data) => {
+    async function loadScroller() {
+      try {
+        const data = await fetchHomeHighlights();
         if (!cancelled) setScroller(data.scroller);
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) setScroller({ enabled: true, message: underConstructionNotice });
-      });
+      }
+    }
+
+    void loadScroller();
+    const intervalId = window.setInterval(() => {
+      void loadScroller();
+    }, 30_000);
+
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
     };
   }, []);
 
@@ -95,7 +104,7 @@ export function Header() {
                 />
               </span>
               <div className="hidden min-w-0 flex-col leading-tight sm:flex">
-                <span className="truncate text-[1.35rem] font-black tracking-tight text-slate-900 sm:text-[1.55rem]">
+                <span className="truncate text-[1.2rem] font-black tracking-tight text-slate-900 sm:text-[1.35rem] xl:text-[1.45rem]">
                   KANTRI <span className="text-indigo-600">LAWYER</span>
                 </span>
               </div>
@@ -117,27 +126,34 @@ export function Header() {
           </div>
 
           <nav className="hidden items-center gap-1 lg:flex">
-            <NavLink href="/">Home</NavLink>
             <NavMegaMenuTrigger base="/courses" label="Courses" />
             <NavMegaMenuTrigger base="/ebooks" label="eBooks" />
             <NavLink href="/books">Physical Books</NavLink>
             <NavLink href="/live-classes">Live Classes</NavLink>
             <NavLink href="/practice-exams">Practice Exams</NavLink>
-            <NavLink href="/articles">Article</NavLink>
+            <NavLink href="/articles">Articles</NavLink>
             <NavLink href="/contact">Contact</NavLink>
           </nav>
 
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             {user && (
-              <>
+              <div
+                className="relative hidden sm:block"
+                onMouseEnter={() => setProfileHover(true)}
+                onMouseLeave={() => setProfileHover(false)}
+              >
                 <Link
                   href={accountHref}
-                  className="hidden max-w-[10rem] truncate rounded-lg px-2 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 sm:inline-block"
-                  title={user.name}
+                  className="inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
                 >
-                  {user.name.split(/\s+/)[0]}
+                  Profile
                 </Link>
-              </>
+                {profileHover && (
+                  <div className="absolute right-0 top-full z-50 mt-2 min-w-[11rem] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-lg">
+                    {user.name}
+                  </div>
+                )}
+              </div>
             )}
             <Link
               href={user ? '/checkout' : '/login?next=%2Fcheckout'}

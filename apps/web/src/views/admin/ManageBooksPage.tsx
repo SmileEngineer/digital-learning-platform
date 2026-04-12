@@ -5,6 +5,7 @@ import { Edit, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
 import { AdminNotice, AdminPageHeader, AdminSectionCard } from '@/components/AdminPageChrome';
+import { useModuleCategories } from '@/contexts/SiteConfigContext';
 import {
   createAdminBook,
   fetchAdminBook,
@@ -30,7 +31,7 @@ type FormState = {
   galleryText: string;
 };
 
-function createEmptyForm(): FormState {
+function createEmptyForm(defaultCategory = 'Books'): FormState {
   return {
     title: '',
     slug: '',
@@ -38,7 +39,7 @@ function createEmptyForm(): FormState {
     imageUrl: '',
     price: '0',
     authorName: '',
-    category: 'Books',
+    category: defaultCategory,
     stockQuantity: '0',
     status: 'published',
     tagsText: '',
@@ -91,14 +92,18 @@ function toPayload(form: FormState): AdminBookInput {
 }
 
 export function ManageBooksPage() {
+  const moduleCategories = useModuleCategories();
+  const categoryOptions =
+    moduleCategories.physicalBook.length > 0 ? moduleCategories.physicalBook : ['Books'];
   const [items, setItems] = useState<AdminBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(createEmptyForm);
+  const [form, setForm] = useState<FormState>(() => createEmptyForm(categoryOptions[0] ?? 'Books'));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
 
   async function loadItems() {
     try {
@@ -121,6 +126,19 @@ export function ManageBooksPage() {
     () => [...items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     [items]
   );
+  const availableCategoryOptions = useMemo(
+    () =>
+      form.category && !categoryOptions.includes(form.category)
+        ? [form.category, ...categoryOptions]
+        : categoryOptions,
+    [categoryOptions, form.category]
+  );
+
+  useEffect(() => {
+    if (!form.category && categoryOptions.length > 0) {
+      setForm((current) => ({ ...current, category: categoryOptions[0] }));
+    }
+  }, [categoryOptions, form.category]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -136,6 +154,7 @@ export function ManageBooksPage() {
       });
       setEditingId(saved.id);
       setForm(toFormState(saved));
+      setEditorOpen(true);
       setMessage(editingId ? 'Book updated successfully.' : 'Book created successfully.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save book.');
@@ -150,6 +169,7 @@ export function ManageBooksPage() {
       const item = await fetchAdminBook(id);
       setEditingId(item.id);
       setForm(toFormState(item));
+      setEditorOpen(true);
       setMessage(`Editing "${item.title}"`);
       setError(null);
     } catch (err) {
@@ -161,9 +181,10 @@ export function ManageBooksPage() {
 
   function resetForm() {
     setEditingId(null);
-    setForm(createEmptyForm());
+    setForm(createEmptyForm(categoryOptions[0] ?? 'Books'));
     setMessage(null);
     setError(null);
+    setEditorOpen(true);
   }
 
   return (
@@ -185,7 +206,7 @@ export function ManageBooksPage() {
           </Button>
           <Button onClick={resetForm}>
             <Plus className="w-4 h-4 mr-2" />
-            New Book
+            Create Book
           </Button>
           </>
         }
@@ -194,11 +215,17 @@ export function ManageBooksPage() {
       {message && <AdminNotice tone="success">{message}</AdminNotice>}
       {error && <AdminNotice tone="error">{error}</AdminNotice>}
 
-      <div className="grid gap-8 xl:grid-cols-[1.25fr,0.95fr]">
+      <div className={editorOpen ? 'grid gap-8 xl:grid-cols-[1.25fr,0.95fr]' : 'space-y-6'}>
+        {editorOpen ? (
         <form onSubmit={handleSubmit}>
           <AdminSectionCard
             title={editingId ? 'Edit Book' : 'Create Book'}
-            description="Organize all storefront, stock, and shipping metadata in a cleaner publishing form."
+            description="Open the editor only when you need to add or revise a physical book."
+            badge={
+              <Button variant="ghost" onClick={() => setEditorOpen(false)}>
+                Close Editor
+              </Button>
+            }
           >
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block">
@@ -227,7 +254,13 @@ export function ManageBooksPage() {
               </label>
               <label className="block">
                 <span className="mb-2 block text-sm text-slate-700">Category</span>
-                <input value={form.category} onChange={(e) => setForm((c) => ({ ...c, category: e.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2" />
+                <select value={form.category} onChange={(e) => setForm((c) => ({ ...c, category: e.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2">
+                  {availableCategoryOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="block">
                 <span className="mb-2 block text-sm text-slate-700">Stock quantity</span>
@@ -268,10 +301,11 @@ export function ManageBooksPage() {
             </div>
           </AdminSectionCard>
         </form>
+        ) : null}
 
         <AdminSectionCard
           title="Inventory Library"
-          description="Quickly scan stock status and jump into editing without losing your place in the form."
+          description="Review the current inventory first, then open the editor only when needed."
           className="xl:sticky xl:top-24 self-start"
         >
           <div className="space-y-4">

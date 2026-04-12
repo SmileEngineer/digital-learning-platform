@@ -1,8 +1,17 @@
 import { readAuthError } from '@/lib/api';
 
-export type CourseAccessType = 'lifetime' | 'fixed_months';
+export type CourseAccessType = 'lifetime' | 'fixed_months' | 'fixed_date';
 export type CourseStatus = 'draft' | 'published';
 export type UserRole = 'student' | 'admin' | 'staff' | 'super_admin';
+
+export type CourseQuizQuestion = {
+  prompt: string;
+  options: Array<{
+    id: string;
+    text: string;
+  }>;
+  correctOptionIds: string[];
+};
 
 export type CourseSummary = {
   id: string;
@@ -24,6 +33,7 @@ export type CourseSummary = {
   previewLectureCount: number;
   accessType: CourseAccessType;
   accessMonths: number | null;
+  accessFixedDate?: string | null;
   studentsCount: number;
   learningPoints: string[];
   requirements: string[];
@@ -56,6 +66,7 @@ export type CourseDetail = CourseSummary & {
       isPreview: boolean;
       quizTitle: string | null;
       quizQuestionCount: number;
+      quizQuestions?: CourseQuizQuestion[];
     }>;
   }>;
 };
@@ -90,6 +101,7 @@ export type AdminCourseInput = {
   tag?: string | null;
   accessType: CourseAccessType;
   accessMonths?: number | null;
+  accessFixedDate?: string | null;
   status: CourseStatus;
   learningPoints: string[];
   requirements: string[];
@@ -106,6 +118,7 @@ export type AdminCourseInput = {
       isPreview: boolean;
       quizTitle?: string | null;
       quizQuestionCount?: number;
+      quizQuestions?: CourseQuizQuestion[];
     }>;
   }>;
 };
@@ -222,4 +235,13 @@ export async function updateAdminCourse(id: string, input: AdminCourseInput): Pr
   if (!res.ok) throw new Error(await readAuthError(res));
   courseListCache.clear();
   return (await parseJson<{ course: AdminCourse }>(res)).course;
+}
+
+export async function deleteAdminCourse(id: string): Promise<void> {
+  const res = await fetch(`/api/admin/courses/${id}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error(await readAuthError(res));
+  courseListCache.clear();
 }

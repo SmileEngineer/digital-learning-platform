@@ -1,6 +1,14 @@
 import { Router } from 'express';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import { listCatalogItems, getCatalogItemBySlug, mapCatalogItem, type CatalogItemType } from '../platform.js';
+import {
+  DEFAULT_HOME_BANNER,
+  DEFAULT_MODULE_CATEGORIES,
+  DEFAULT_SITE_NAVIGATION,
+  parseHomeBanner,
+  parseModuleCategories,
+  parseNavigationConfig,
+} from '../site-config-defaults.js';
 
 function parseType(value: unknown): CatalogItemType | undefined {
   const allowed: CatalogItemType[] = ['course', 'ebook', 'physical_book', 'live_class', 'practice_exam', 'article'];
@@ -11,6 +19,54 @@ function parseType(value: unknown): CatalogItemType | undefined {
 
 export function createCatalogRouter(sql: NeonQueryFunction<false, false>): Router {
   const router = Router();
+
+  async function readSiteConfig() {
+    const rows = await sql`
+      SELECT
+        home_scroller_enabled,
+        home_scroller_message,
+        home_banner_eyebrow,
+        home_banner_title,
+        home_banner_description,
+        course_navigation,
+        ebook_navigation,
+        module_categories
+      FROM site_settings
+      WHERE id = 1
+      LIMIT 1
+    `;
+
+    const row =
+      rows[0] as
+        | {
+            home_scroller_enabled: boolean;
+            home_scroller_message: string | null;
+            home_banner_eyebrow: string | null;
+            home_banner_title: string | null;
+            home_banner_description: string | null;
+            course_navigation: unknown;
+            ebook_navigation: unknown;
+            module_categories: unknown;
+          }
+        | undefined;
+
+    return {
+      scroller: {
+        enabled: row?.home_scroller_enabled ?? false,
+        message: row?.home_scroller_message ?? '',
+      },
+      homeBanner: parseHomeBanner({
+        eyebrow: row?.home_banner_eyebrow ?? DEFAULT_HOME_BANNER.eyebrow,
+        title: row?.home_banner_title ?? DEFAULT_HOME_BANNER.title,
+        description: row?.home_banner_description ?? DEFAULT_HOME_BANNER.description,
+      }),
+      navigation: parseNavigationConfig({
+        courses: row?.course_navigation ?? DEFAULT_SITE_NAVIGATION.courses,
+        ebooks: row?.ebook_navigation ?? DEFAULT_SITE_NAVIGATION.ebooks,
+      }),
+      moduleCategories: parseModuleCategories(row?.module_categories ?? DEFAULT_MODULE_CATEGORIES),
+    };
+  }
 
   router.get('/items', async (req, res) => {
     try {
@@ -44,7 +100,7 @@ export function createCatalogRouter(sql: NeonQueryFunction<false, false>): Route
 
   router.get('/highlights', async (_req, res) => {
     try {
-      const [courses, ebooks, liveClasses, exams, books, articles, counts, settingRows] = await Promise.all([
+      const [courses, ebooks, liveClasses, exams, books, articles, counts, siteConfig] = await Promise.all([
         listCatalogItems(sql, { type: 'course', featured: true, limit: 3 }),
         listCatalogItems(sql, { type: 'ebook', featured: true, limit: 4 }),
         listCatalogItems(sql, { type: 'live_class', featured: true, limit: 3 }),
@@ -59,11 +115,7 @@ export function createCatalogRouter(sql: NeonQueryFunction<false, false>): Route
             (SELECT COUNT(*)::int FROM users) AS users_count
           FROM catalog_items
         `,
-        sql`
-          SELECT home_scroller_enabled, home_scroller_message
-          FROM site_settings
-          WHERE id = 1
-        `,
+        readSiteConfig(),
       ]);
 
       const statsRow = counts[0] as {
@@ -72,7 +124,6 @@ export function createCatalogRouter(sql: NeonQueryFunction<false, false>): Route
         exams_count: number;
         users_count: number;
       };
-      const settings = settingRows[0] as { home_scroller_enabled: boolean; home_scroller_message: string | null } | undefined;
 
       res.json({
         featuredCourses: courses,
@@ -87,14 +138,21 @@ export function createCatalogRouter(sql: NeonQueryFunction<false, false>): Route
           ebooks: statsRow?.ebooks_count ?? 0,
           successRate: 95,
         },
-        scroller: {
-          enabled: settings?.home_scroller_enabled ?? false,
-          message: settings?.home_scroller_message ?? '',
-        },
+        scroller: siteConfig.scroller,
+        homeBanner: siteConfig.homeBanner,
       });
     } catch (e) {
       console.error('catalog.highlights', e);
       res.status(500).json({ error: 'Could not load homepage highlights.' });
+    }
+  });
+
+  router.get('/site-config', async (_req, res) => {
+    try {
+      res.json(await readSiteConfig());
+    } catch (e) {
+      console.error('catalog.site-config', e);
+      res.status(500).json({ error: 'Could not load site configuration.' });
     }
   });
 
